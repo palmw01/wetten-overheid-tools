@@ -1,0 +1,12 @@
+# Node
+wettenbank-mcp/node_modules/
+wettenbank-mcp/dist/
+
+# Lokale Claude Code instellingen (machine-specifiek)
+.claude/settings.local.json
+
+# Gegenereerde wetsanalyse-rapporten (optioneel meenemen per project)
+# analyses/*.md  # uncomment om gegenereerde rapporten te negeren
+
+# Gegenereerde HTML-renders van rapporten
+analyses/*.html
