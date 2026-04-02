@@ -26,20 +26,31 @@ Roep vanuit het project aan:
 /wetzoek dwangbevel
 ```
 
-Het commando doorzoekt automatisch de volgende kernwetten via de MCP wettenbank:
+Het commando doorzoekt automatisch de volgende kernbronnen via de MCP wettenbank:
 
-| Wet | BWB-id |
-|-----|--------|
+| Bron | BWB-id |
+|------|--------|
 | Invorderingswet 1990 | BWBR0004770 |
+| Leidraad Invordering 2008 | BWBR0004800 |
 | Uitvoeringsbesluit IW 1990 | BWBR0004772 |
 | AWR | BWBR0002320 |
 | Awb | BWBR0005537 |
 
 ## Rapportstructuur
 
-Elk rapport bevat:
-1. **Statistieken** — treffers per wet, artikelnummers
-2. **Vindplaatsen** — letterlijke wettekst per artikel
-3. **Kruisreferenties** — interne en externe verwijzingen uitgewerkt
-4. **Juridische samenvatting** — betekenis, samenhang, praktijkaandachtspunten
-5. **Bronnen** — met geraadpleegde versie en peildatum
+Elk `/wetzoek`-rapport bevat:
+1. **Statistieken** — treffers per bron, artikelnummers, gezochte varianten
+2. **Vindplaatsen** — letterlijke wetstekst per artikel (nooit parafrase)
+3. **Kruisreferenties** — intern (binnen wet) en extern (naar andere wet), incl. Awb-toepasselijkheidscheck
+4. **Juridische samenvatting** — betekenis, samenhang, spanningsvelden, praktijkaandachtspunten, jurisprudentie
+5. **Bronnen** — per bron met geldigheidsdatum (peildatum)
+
+## JAS-annotaties
+
+Naast `/wetzoek`-rapporten bevat deze map ook JAS-annotaties van afzonderlijke wetsartikelen.
+Naamconventie: `jas-annotatie-[artikel]-[wet]-[timestamp].md`
+
+Voorbeeld: `jas-annotatie-art9-iw1990-2026-04-02_08-57-55.md`
+
+Een JAS-annotatie classificeert elke formulering in het artikel conform het Juridisch Analyseschema v1.0.7.
+Zie `jas-kaders.md` voor de volledige annotatiekaders.

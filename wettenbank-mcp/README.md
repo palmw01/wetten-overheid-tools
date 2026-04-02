@@ -37,16 +37,19 @@ Bestand: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 Herstart Claude Desktop. De tools zijn direct beschikbaar.
 
-## Bekende BWB-id's (belastingrecht)
+## Bekende BWB-id's (belastingrecht / invordering)
 
 | Wet | BWB-id |
 |---|---|
+| Invorderingswet 1990 | BWBR0004770 |
+| Leidraad Invordering 2008 | BWBR0004800 |
+| Uitvoeringsbesluit Invorderingswet 1990 | BWBR0004772 |
 | Algemene wet inzake rijksbelastingen (AWR) | BWBR0002320 |
+| Algemene wet bestuursrecht (Awb) | BWBR0005537 |
 | Wet inkomstenbelasting 2001 | BWBR0011353 |
 | Wet op de vennootschapsbelasting 1969 | BWBR0002672 |
 | Wet op de omzetbelasting 1968 | BWBR0002629 |
 | Wet op de loonbelasting 1964 | BWBR0002471 |
-| Invorderingswet 1990 | BWBR0004770 |
 
 ## Technische details
 
