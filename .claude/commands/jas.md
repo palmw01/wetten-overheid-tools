@@ -87,7 +87,7 @@ Voor **externe** verwijzingen: gebruik `wettenbank_ophalen(bwbId=<id>, artikel=<
 
 Gebruik de definities, herkenningsvragen en taalkenmerken uit `jas-kaders.md`. Voer de annotatie uit op de wetstekst van artikel `[A]` uit Stap 2a, aangevuld met de brondefinities uit Stap 2b.
 
-**Interne annotatiestap (niet opnemen in rapportoutput):** loop de 13 JAS-elementen af en bepaal per element of het aanwezig is in het artikel: rechtssubject, rechtsobject, rechtsbetrekking, rechtsfeit, voorwaarde, afleidingsregel, variabele/variabelewaarde, parameter/parameterwaarde, operator, tijdsaanduiding, plaatsaanduiding, delegatiebevoegdheid/delegatie-invulling, brondefinitie. Noteer per aanwezig element de vindplaats in het artikel én de bijbehorende hex-kleurcode uit de kleurentabel in `jas-kaders.md` § Kleurcodering (gebruik in §4 als achtergrondkleur van de Nr-cel).
+**Interne annotatiestap (niet opnemen in rapportoutput):** loop de 13 JAS-elementen af en bepaal per element of het aanwezig is in het artikel: rechtssubject, rechtsobject, rechtsbetrekking, rechtsfeit, voorwaarde, afleidingsregel, variabele/variabelewaarde, parameter/parameterwaarde, operator, tijdsaanduiding, plaatsaanduiding, delegatiebevoegdheid/delegatie-invulling, brondefinitie. Noteer per aanwezig element de vindplaats in het artikel.
 
 **Annotatieprincipes:**
 1. Citeer het exacte zinsdeel letterlijk bij elk geclassificeerd element.
@@ -234,14 +234,14 @@ Maak per lid een subsectie. Nummer annotaties doorlopend over alle leden.
 
 | Nr | Formulering (letterlijk geciteerd) | JAS-element | Toelichting |
 |----|-----------------------------------|-------------|-------------|
-| <span style="background-color:#4472C4">1</span> | "[citaat]" | **[JAS-klasse]** | [interpretatiemethode + motivering] |
-| <span style="background-color:#FF0000">2</span> | "[citaat]" | **[JAS-klasse]** | [interpretatiemethode + motivering] |
+| 1 | "[citaat]" | **[JAS-klasse]** | [interpretatiemethode + motivering] |
+| 2 | "[citaat]" | **[JAS-klasse]** | [interpretatiemethode + motivering] |
 
 ### 4.2 Lid 2 — [korte omschrijving]
 
 | Nr | Formulering (letterlijk geciteerd) | JAS-element | Toelichting |
 |----|-----------------------------------|-------------|-------------|
-| <span style="background-color:#XXXXXX">[doorlopend nummer]</span> | "[citaat]" | **[JAS-klasse]** | [toelichting] |
+| [doorlopend nummer] | "[citaat]" | **[JAS-klasse]** | [toelichting] |
 ```
 
 Na het laatste lid: voeg toe:
@@ -426,4 +426,3 @@ Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisrefere
 - **MvT-verwijzingen alleen geverifieerd.** Nooit Kamerstukken-verwijzingen fabriceren; altijd "Verificatie vereist" markeren.
 - **Nulresultaat Leidraad: standaardmelding.** Gebruik exact de voorgeschreven tekst.
 - **Altijd opslaan.** Rapport als MD-bestand in `analyses/` conform het bestandsnaamschema in Stap 8.
-- **Kleurcodering Nr-cel.** In §4 krijgt elke Nr-cel de achtergrondkleur van het geclassificeerde JAS-element via `<span style="background-color:#XXXXXX">Nr</span>`. Gebruik de hex-codes uit de mapping in Stap 5.
