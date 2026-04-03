@@ -81,35 +81,9 @@ De MCP retourneert alleen geldende (niet-vervallen) artikelen. Vervallen artikel
 
 De Awb (BWBR0005537) is te groot voor de 50KB-limiet bij een volledige opvraging. Gebruik voor Awb-artikelen (ook hfst. 4-10) altijd de `artikel`-parameter: `wettenbank_ophalen(bwbId="BWBR0005537", artikel="3:40")`. De MCP haalt dan uitsluitend dat artikel op, ongeacht de positie in de wet. Dit geldt ook voor andere grote wetten.
 
-**Twee strategieën afhankelijk van het aantal benodigde artikelen**
+**Meerdere artikelen nodig → parallel aanroepen**
 
-- **Één artikel nodig** → gebruik `wettenbank_ophalen(bwbId=<id>, artikel=<nr>)`: directe opvraging, geen nabewerking nodig.
-- **Meerdere artikelen uit dezelfde wet** → gebruik `wettenbank_ophalen(bwbId=<id>)` zonder `artikel`-parameter en extraheer via Bash. Één call volstaat; meerdere calls naar dezelfde wet zijn overbodig.
-
-**Standaard extractiecommando (voor multi-artikel opvraging via Bash)**
-
-Alleen nodig als de volledige wet is opgehaald (zonder `artikel`-parameter). Nooit de preview gebruiken als artikelbron.
-
-```bash
-python3 -c "
-import json, re
-def extraheer_artikel(jsonfile, artikel):
-    with open(jsonfile) as f:
-        text = json.load(f)[0]['text']
-    parts = re.split(r'(?=Artikel \d)', text)
-    result = next((p for p in parts if re.match(rf'Artikel {re.escape(str(artikel))}[ \t]', p)), None)
-    if not result:
-        return f'Artikel {artikel} niet gevonden'
-    clean = re.sub(r'\s*\d{4}\s+\d+\s+\d{2}-\d{2}-\d{4}.*', '', result, flags=re.DOTALL)
-    return clean.strip()
-
-print(extraheer_artikel('PAD_NAAR_JSON', 'ARTIKELNUMMER'))
-"
-```
-
-- `PAD_NAAR_JSON`: het pad uit de tool-result melding (`/home/willardp/.claude/.../tool-results/toolu_XXX.json`)
-- `ARTIKELNUMMER`: bijv. `"9"`, `"25"`, `"3:40"` (voor Awb), `"2a"`
-- Werkt voor alle wetten met dezelfde JSON-structuur (IW 1990, AWR, Awb, UB IW)
+Roep `wettenbank_ophalen(bwbId=<id>, artikel=<nr>)` parallel aan voor elk benodigd artikel. Dit is efficiënter dan één volledige wet ophalen en via Bash extraheren. De tekst staat direct in elk tool-resultaat — geen nabewerking nodig.
 
 **Bestaande annotaties hergebruiken (voor /jas)**
 

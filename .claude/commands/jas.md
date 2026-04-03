@@ -47,35 +47,13 @@ Noteer: `[A]`, `[W]`, `[B]`, `[L]`, en het begripsbepalings-artikel `[BD]`.
 
 ## Stap 2 — Wetstekst ophalen en artikelen extraheren
 
-**2a. Artikel [A] direct ophalen via MCP:**
+**Parallel aanroepen via MCP:**
 
-Roep aan: `wettenbank_ophalen(bwbId=[B], artikel=[A])`
+Roep tegelijk aan:
+- `wettenbank_ophalen(bwbId=[B], artikel=[A])` — te annoteren artikel
+- `wettenbank_ophalen(bwbId=[B], artikel=[BD])` — begripsbepalingen
 
-De `artikel`-parameter geeft uitsluitend het gevraagde artikel terug en werkt ook voor grote wetten (Awb, IW 1990 voorbij 50KB-grens). De wetstekst staat direct in het tool-resultaat. Noteer de peildatum `[PD]`, de geldigheidsdatum en de volledige letterlijke wetstekst inclusief het hoofdstuk/de afdeling.
-
-**2b. Volledige wet ophalen voor begripsbepalingen en art. 1:**
-
-Roep eenmalig aan: `wettenbank_ophalen(bwbId=[B])` (zonder `artikel`). Noteer het bestandspad `[JSON_IW]` uit de tool-result melding. Dit bestand is nodig voor Stap 2c en Stap 3. Geen nieuwe MCP-call nodig als `[JSON_IW]` al beschikbaar is.
-
-**2c. Begripsbepalingen extraheren via Bash (uit `[JSON_IW]`):**
-
-```bash
-python3 -c "
-import json, re
-def extraheer_artikel(jsonfile, artikel):
-    with open(jsonfile) as f:
-        text = json.load(f)[0]['text']
-    parts = re.split(r'(?=Artikel \d)', text)
-    result = next((p for p in parts if re.match(rf'Artikel {re.escape(str(artikel))}[ \t]', p)), None)
-    if not result:
-        return f'Artikel {artikel} niet gevonden'
-    clean = re.sub(r'\s*\d{4}\s+\d+\s+\d{2}-\d{2}-\d{4}.*', '', result, flags=re.DOTALL)
-    return clean.strip()
-print(extraheer_artikel('[JSON_IW]', '[BD]'))
-"
-```
-
-Noteer alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
+Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. Noteer de peildatum `[PD]` en geldigheidsdatum uit de metadata. Noteer de volledige letterlijke wetstekst van artikel `[A]` inclusief het hoofdstuk/de afdeling. Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
 
 ---
 
@@ -83,25 +61,7 @@ Noteer alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A
 
 **Alleen als `[W]` = Invorderingswet 1990 of Uitvoeringsbesluit IW 1990:**
 
-Art. 1 IW 1990 zit in hetzelfde JSON-bestand `[JSON_IW]` — geen nieuwe MCP-call nodig. Tenzij art. 1 al het te annoteren artikel is (dan is de tekst al beschikbaar uit Stap 2b):
-
-```bash
-python3 -c "
-import json, re
-def extraheer_artikel(jsonfile, artikel):
-    with open(jsonfile) as f:
-        text = json.load(f)[0]['text']
-    parts = re.split(r'(?=Artikel \d)', text)
-    result = next((p for p in parts if re.match(rf'Artikel {re.escape(str(artikel))}[ \t]', p)), None)
-    if not result:
-        return f'Artikel {artikel} niet gevonden'
-    clean = re.sub(r'\s*\d{4}\s+\d+\s+\d{2}-\d{2}-\d{4}.*', '', result, flags=re.DOTALL)
-    return clean.strip()
-print(extraheer_artikel('[JSON_IW]', '1'))
-"
-```
-
-Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
+Roep aan: `wettenbank_ophalen(bwbId="BWBR0004770", artikel="1")` — tenzij `[A]` = 1 (dan is de tekst al beschikbaar uit Stap 2). De tekst staat direct in het tool-resultaat. Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
 
 **Leidraad Invordering 2008 ophalen via MCP (verplicht bij IW 1990 en UB IW)**
 
