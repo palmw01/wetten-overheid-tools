@@ -7,8 +7,5 @@ wettenbank-mcp/node_modules/
 # Lock-bestand — geen analytische waarde
 wettenbank-mcp/package-lock.json
 
-# Hulpscript buiten de primaire workflow
-wettenbank_xml.py
-
 # Gegenereerde wetsanalyse-rapporten — groot en on-demand bereikbaar via Glob/Read
 analyses/
