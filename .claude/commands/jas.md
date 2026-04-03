@@ -51,33 +51,13 @@ Noteer: `[A]`, `[W]`, `[B]`, `[L]`, en het begripsbepalings-artikel `[BD]`.
 
 Roep aan: `wettenbank_ophalen(bwbId=[B], artikel=[A])`
 
-De `artikel`-parameter geeft uitsluitend het gevraagde artikel terug en werkt ook voor grote wetten (Awb, IW 1990 voorbij 50KB-grens). Noteer de peildatum `[PD]` en geldigheidsdatum uit de MCP-metadata. De wetstekst staat direct in het tool-resultaat — geen Bash-extractie nodig voor dit artikel.
+De `artikel`-parameter geeft uitsluitend het gevraagde artikel terug en werkt ook voor grote wetten (Awb, IW 1990 voorbij 50KB-grens). De wetstekst staat direct in het tool-resultaat. Noteer de peildatum `[PD]`, de geldigheidsdatum en de volledige letterlijke wetstekst inclusief het hoofdstuk/de afdeling.
 
-Voor begripsbepalingen (Stap 2c) en art. 1 (Stap 3) is een volledige opvraging nodig: roep daarna eenmalig `wettenbank_ophalen(bwbId=[B])` aan (zonder `artikel`) en noteer het bestandspad `[JSON_IW]`.
+**2b. Volledige wet ophalen voor begripsbepalingen en art. 1:**
 
-**2b. Artikel [A] — tekst uit MCP-resultaat (Stap 2a):**
+Roep eenmalig aan: `wettenbank_ophalen(bwbId=[B])` (zonder `artikel`). Noteer het bestandspad `[JSON_IW]` uit de tool-result melding. Dit bestand is nodig voor Stap 2c en Stap 3. Geen nieuwe MCP-call nodig als `[JSON_IW]` al beschikbaar is.
 
-```bash
-python3 -c "
-import json, re
-def extraheer_artikel(jsonfile, artikel):
-    with open(jsonfile) as f:
-        text = json.load(f)[0]['text']
-    parts = re.split(r'(?=Artikel \d)', text)
-    result = next((p for p in parts if re.match(rf'Artikel {re.escape(str(artikel))}[ \t]', p)), None)
-    if not result:
-        return f'Artikel {artikel} niet gevonden'
-    clean = re.sub(r'\s*\d{4}\s+\d+\s+\d{2}-\d{2}-\d{4}.*', '', result, flags=re.DOTALL)
-    return clean.strip()
-print(extraheer_artikel('[JSON_IW]', '[A]'))
-"
-```
-
-Noteer de volledige letterlijke tekst en het hoofdstuk/de afdeling waarbinnen het artikel valt.
-
-**2c. Begripsbepalingen extraheren via Bash (uit hetzelfde JSON-bestand):**
-
-Hergebruik `[JSON_IW]` — geen nieuwe MCP-call nodig:
+**2c. Begripsbepalingen extraheren via Bash (uit `[JSON_IW]`):**
 
 ```bash
 python3 -c "
@@ -125,7 +105,7 @@ Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausul
 
 **Leidraad Invordering 2008 ophalen via MCP (verplicht bij IW 1990 en UB IW)**
 
-Roep aan: `wettenbank_ophalen(bwbId="BWBR0024096")` — noteer het JSON-pad `[JSON_LI]`. Extraheer het relevante Leidraad-artikel via Bash uit `[JSON_LI]`. De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport.
+Roep aan: `wettenbank_ophalen(bwbId="BWBR0024096", artikel=[A])` — het Leidraad-artikel met hetzelfde nummer als het te annoteren artikel staat direct in het tool-resultaat. De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport. Bij 0 resultaat (geen overeenkomstig Leidraad-artikel): noteer dit en sla §8 over.
 
 **Als `[W]` ≠ IW 1990 en ≠ UB IW:** sla Stap 3 over.
 
@@ -139,27 +119,7 @@ Maak twee lijsten:
 - **Intern**: verwijzingen naar artikelen binnen dezelfde wet `[W]` — extraheer via Bash uit `[JSON_IW]`
 - **Extern**: verwijzingen naar artikelen in andere wetten
 
-Voor **externe** verwijzingen per wet:
-1. Roep `wettenbank_ophalen(bwbId=<id van die wet>)` aan — noteer het JSON-pad `[JSON_EXT]`
-2. Extraheer elk gerefereerd artikel via Bash:
-
-```bash
-python3 -c "
-import json, re
-def extraheer_artikel(jsonfile, artikel):
-    with open(jsonfile) as f:
-        text = json.load(f)[0]['text']
-    parts = re.split(r'(?=Artikel \d)', text)
-    result = next((p for p in parts if re.match(rf'Artikel {re.escape(str(artikel))}[ \t]', p)), None)
-    if not result:
-        return f'Artikel {artikel} niet gevonden'
-    clean = re.sub(r'\s*\d{4}\s+\d+\s+\d{2}-\d{2}-\d{4}.*', '', result, flags=re.DOTALL)
-    return clean.strip()
-print(extraheer_artikel('[JSON_EXT]', '[ARTIKELNUMMER]'))
-"
-```
-
-Eén MCP-call per externe wet volstaat; extraheer alle gerefereerde artikelen uit datzelfde JSON-bestand via herhaalde Bash-aanroepen.
+Voor **externe** verwijzingen: gebruik `wettenbank_ophalen(bwbId=<id>, artikel=<nr>)` per gerefereerd artikel. Dit werkt ook voor Awb-artikelen in hfst. 4-10 die onbereikbaar zijn bij volledige opvraging. Roep alle externe artikelen parallel aan.
 
 ---
 

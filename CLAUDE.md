@@ -69,9 +69,9 @@ De Leidraad Invordering 2008 is beschikbaar via MCP onder BWB-id `BWBR0024096` (
 
 ## MCP wettenbank — structurele beperkingen en extractieprocedure
 
-**`wettenbank_ophalen` retourneert maximaal ~50KB van de wet**
+**`wettenbank_ophalen` zonder `artikel`-parameter: maximaal ~50KB**
 
-De MCP-tool retourneert de wettekst als JSON-bestand op één regel, maar is beperkt tot ~50KB. De Read tool en Grep kunnen dit niet verwerken. De 2KB-preview is **niet** bruikbaar als bron — die toont toevallig alleen het begin van de wet en is geen betrouwbare methode.
+Bij een volledige wet-opvraging retourneert de MCP-tool de wettekst als JSON-bestand. Dit bestand is beperkt tot ~50KB. De Read tool en Grep kunnen dit niet verwerken. De 2KB-preview in het tool-resultaat is **niet** bruikbaar als bron — die toont toevallig alleen het begin van de wet. Met de `artikel`-parameter is er geen bestandsgroottegrens: de tekst van dat artikel staat direct in het tool-resultaat.
 
 **Vervallen artikelen worden gefilterd door MCP**
 
@@ -144,10 +144,10 @@ Bij het uitvoeren van `/wetzoek` gelden de volgende verplichte standaarden, geba
 5. Jurisprudentie en beleid — met "Verificatie vereist" als vindplaats niet zeker is; nooit arresten verzinnen
 
 **Awb-toepasselijkheid**
-- Controleer bij relevante Awb-bevindingen altijd of de betreffende titel/afdeling van toepassing is via art. 1 lid 2 IW 1990. Meld de uitkomst in §3.2 van het rapport.
+- Controleer bij relevante Awb-bevindingen altijd of de betreffende titel/afdeling van toepassing is via art. 1 lid 2 IW 1990. Meld de uitkomst in §2.5 van het rapport (Awb-vindplaatsen).
 
 **Leidraad Invordering als beleidsbron**
-- De Leidraad Invordering 2008 is beschikbaar via MCP onder `BWBR0024096`. Haal deze op via `wettenbank_ophalen(bwbId="BWBR0024096")` en extraheer het relevante artikel via Bash. De Leidraad is een beleidsregel (geen wet), maar bevat de invorderingspraktijk van de ontvanger en is een verplichte bron bij IW 1990- en UB IW-annotaties.
+- De Leidraad Invordering 2008 is beschikbaar via MCP onder `BWBR0024096`. Haal het relevante artikel op via `wettenbank_ophalen(bwbId="BWBR0024096", artikel=<nr>)`. De Leidraad is een beleidsregel (geen wet), maar bevat de invorderingspraktijk van de ontvanger en is een verplichte bron bij IW 1990- en UB IW-annotaties.
 
 **Nulresultaten**
 - Meld expliciet als een bron geen treffer geeft, welke varianten zijn geprobeerd en wat de mogelijke verklaring is.

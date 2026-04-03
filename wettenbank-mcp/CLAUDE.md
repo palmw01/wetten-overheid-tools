@@ -29,7 +29,7 @@ The entire server lives in `src/index.ts`. It exposes three tools:
 
 **Data flow:** Claude calls a tool → tool handler builds a CQL query → `sruRequest()` hits the SRU endpoint → XML parsed with `fast-xml-parser` → `parseRecords()` extracts `Regeling` objects → formatted as markdown and returned to Claude.
 
-For `wettenbank_ophalen`, there's an extra step: after finding the regulation via SRU, it fetches the full XML from `repository.officiele-overheidspublicaties.nl/bwb/` and strips it to plain text via `stripXml()` (capped at 50KB).
+For `wettenbank_ophalen`, there's an extra step: after finding the regulation via SRU, it fetches the full XML from `repository.officiele-overheidspublicaties.nl/bwb/` and strips it to plain text via `stripXml()`. When `artikel` is given, only that article's XML node is extracted before stripping, keeping the response small regardless of regulation size.
 
 ### `wettenbank_zoek` — zoekgedrag
 
@@ -51,7 +51,7 @@ Optionele parameter `zoekterm`: na het ophalen van de wetstekst worden alle vind
 
 ## Deployment
 
-To use this server with Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -59,6 +59,19 @@ To use this server with Claude Desktop, add to `~/Library/Application Support/Cl
     "wettenbank": {
       "command": "node",
       "args": ["/absolute/path/to/dist/index.js"]
+    }
+  }
+}
+```
+
+**Claude Code CLI** — add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "wettenbank": {
+      "command": "node",
+      "args": ["/absolute/path/to/wettenbank-mcp/dist/index.js"]
     }
   }
 }
