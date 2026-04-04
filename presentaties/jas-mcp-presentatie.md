@@ -702,7 +702,7 @@ Artikel 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. **12 lede
 
 ---
 
-## Rapport-structuur: 12 secties + 2 bijlagen
+## Rapport-structuur: 11 secties + 2 bijlagen
 
 <div class="columns">
 <div>
