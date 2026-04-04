@@ -53,9 +53,9 @@ De twee primaire werkinstrumenten zijn `/wetzoek` (termanalyse over vijf bronnen
 
 ## MCP wettenbank — structurele beperkingen
 
-**50KB-limiet bij volledige opvraging**
+**Volledige opvraging is inefficiënt bij grote wetten**
 
-Bij `wettenbank_ophalen` zonder `artikel`-parameter is de teruggegeven tekst beperkt tot ~50KB. De `artikel`-parameter heeft geen groottebeperking — gebruik die voor alle gevallen waarbij een specifiek artikel nodig is, ook in grote wetten zoals de Awb.
+`wettenbank_ophalen` zonder `artikel`-parameter geeft de volledige wetstekst terug zonder truncatie. Bij grote wetten (Awb, IW 1990) is die tekst honderden pagina's lang en belast daarmee het contextvenster van de AI. Gebruik de `artikel`-parameter voor alle gevallen waarbij een specifiek artikel nodig is — dat haalt één XML-node op ongeacht de wetgrootte.
 
 **Vervallen artikelen worden gefilterd**
 

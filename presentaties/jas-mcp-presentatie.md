@@ -555,19 +555,19 @@ Elke aanroep retourneert een **peildatum**. Versies zijn opvraagbaar op elke dat
 
 ---
 
-## Slimme omzeiling: 50 KB-limiet
+## Gerichte artikelophaling
 
 <div class="columns">
 <div class="card">
 
-### Probleem
-Volledige wetten zoals de Awb zijn vaak groter dan 50 KB. Een `wettenbank_ophalen` zonder `artikel`-parameter retourneert alleen het begin.
+### Waarom niet altijd de volledige wet ophalen?
+Grote wetten (Awb, IW 1990) produceren bij volledige opvraging honderden pagina's tekst. Dat vult het contextvenster van de AI en maakt gerichte analyse traag en foutgevoelig.
 
 </div>
 <div class="card-accent">
 
-### Oplossing
-De `artikel`-parameter haalt **één XML-node** op, onafhankelijk van de totale wetgrootte. Werkt voor alle wetten, ook Awb-artikelen verspreid over honderden pagina's.
+### De `artikel`-parameter
+Haalt **één XML-node** op uit de BWB-toestand, ongeacht de wetgrootte. Efficiënt, precies en werkt voor alle wetten — ook de Awb die uit honderden artikelen bestaat.
 
 </div>
 </div>
@@ -581,7 +581,7 @@ Stap 1: SRU-query op titel → BWB-id ophalen
 Stap 2: Volledige tekst downloaden → trefwoord zoeken met contextfragmenten
 ```
 
-> Dit omzeilt een fundamentele beperking van de SRU-interface: `trefwoord` doorzoekt alleen metadata, niet de wetstekst zelf.
+> De SRU-interface doorzoekt met `trefwoord` alleen metadata, niet de wetstekst zelf. De twee-staps aanpak omzeilt dit.
 
 ---
 
