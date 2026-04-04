@@ -48,6 +48,53 @@ Het JAS maakt het mogelijk wetgeving **expliciet en gestructureerd** te annotere
 
 ## 2  Annotatieworkflow — stap voor stap
 
+### Processchema
+
+```mermaid
+flowchart TD
+    START(["/jas artikel wet"])
+
+    START --> S0
+
+    S0["Stap 0\nBestaande annotatie controleren\nGlob analyses/jas-annotatie-artA-*"]
+    S0 --> FOUND{Annotatie\ngevonden?}
+
+    FOUND -->|Ja| SHOW["Meld bestandsnaam en peildatum\naan gebruiker — wacht op bevestiging"]
+    SHOW --> NIEUW{Nieuwe\nannotatie\ngewenst?}
+    NIEUW -->|Nee| STOP([Gestopt])
+    NIEUW -->|Ja| S1
+
+    FOUND -->|Nee| S1
+
+    S1["Stap 1\nArgument parsen\nA  ·  W  ·  B  ·  L  ·  BD"]
+    S1 --> S2
+
+    S2["Stap 2  —  parallel\nwettenbank_ophalen: artikel A\nwettenbank_ophalen: begripsbepalingen BD\nNoteer peildatum PD"]
+    S2 --> IW1{W = IW 1990\nof UB IW?}
+
+    IW1 -->|Ja| S3["Stap 3  —  parallel\nwettenbank_ophalen: art. 1 IW 1990\nwettenbank_ophalen: Leidraad art. A"]
+    IW1 -->|Nee| S4
+    S3 --> S4
+
+    S4["Stap 4  —  parallel\nKruisreferenties extraheren uit artikeltekst\nIntern: binnen W  ·  Extern: per artikel ophalen"]
+    S4 --> S5
+
+    S5["Stap 5\nJAS-annotatie uitvoeren\n13 elementen intern doorlopen\nAnnotatietabel per lid opstellen"]
+    S5 --> S6
+
+    S6["Stap 6\nAfleidingsregels en rekenstructuur uitwerken\nBeslisregels  ·  Rekenregels  ·  Parameters"]
+    S6 --> IW2{W = IW 1990?}
+
+    IW2 -->|Ja| S7["Stap 7\nAwb-toepasselijkheidscheck\no.b.v. art. 1 lid 2 IW 1990"]
+    IW2 -->|Nee| S8
+    S7 --> S8
+
+    S8["Stap 8\nTimestamp ophalen via date\nRapport opslaan als MD-bestand\nanalyses/jas-annotatie-artA-W-TS.md"]
+    S8 --> END([Rapport opgeslagen])
+```
+
+---
+
 Voer de stappen **strikt in volgorde** uit. Wijk niet af van de voorgeschreven formats.
 
 ---

@@ -64,6 +64,54 @@ Claude Code (LLM)
 Claude Code (LLM)
 ```
 
+### Processchema
+
+```mermaid
+flowchart TD
+    IN([Claude — tool call])
+    IN --> DISPATCH{Tool?}
+
+    DISPATCH -->|wettenbank_zoek|       Z1
+    DISPATCH -->|wettenbank_ophalen|    O1
+    DISPATCH -->|wettenbank_wijzigingen| W1
+
+    subgraph SZ [" wettenbank_zoek "]
+        Z1{titel +\ntrefwoord?}
+        Z_TWEE["Stap 1: SRU op titel\nStap 2: XML downloaden\nStap 3: trefwoord in tekst zoeken\nContextfragmenten ± 100 tekens"]
+        Z_EEN["SRU-query CQL\ntitel / rechtsgebied /\nministerie / regelingsoort"]
+        Z_OUT["parseRecords()\ndedupliceerOpBwbId()\nformatRegelingen()"]
+        Z1 -->|"Ja  —  twee-staps"| Z_TWEE --> Z_OUT
+        Z1 -->|"Nee  —  enkel filter"| Z_EEN  --> Z_OUT
+    end
+
+    subgraph SO [" wettenbank_ophalen "]
+        O1["SRU-lookup\nbwbId + peildatum\n→ repositoryUrl"]
+        O2["GET repository XML\nstripXml() → platte tekst"]
+        O3{Parameter?}
+        O_ART["extraheerArtikelUitXml()\nprimair: DOM-traversal\nfallback: extraheerArtikel()"]
+        O_ZT["Vindplaatsen zoeken\n± 150 tekens context\nmax. 10 fragmenten"]
+        O_FULL["Volledige wetstekst\n~ 50 KB limiet"]
+        O1 --> O2 --> O3
+        O3 -->|artikel|  O_ART
+        O3 -->|zoekterm| O_ZT
+        O3 -->|geen|     O_FULL
+    end
+
+    subgraph SW [" wettenbank_wijzigingen "]
+        W1["SRU-query\ndcterms.modified >= sindsdatum\n+ optionele filters"]
+        W2["Sorteren op wijzigingsdatum\ndedupliceerOpBwbId()"]
+        W1 --> W2
+    end
+
+    Z_OUT  --> OUT
+    O_ART  --> OUT
+    O_ZT   --> OUT
+    O_FULL --> OUT
+    W2     --> OUT
+
+    OUT([Markdown-resultaat\nnaar Claude])
+```
+
 ### Externe endpoints
 
 | Endpoint                                                         | Gebruik                                      |
