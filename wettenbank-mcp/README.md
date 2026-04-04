@@ -68,48 +68,36 @@ Claude Code (LLM)
 
 ```mermaid
 flowchart TD
-    IN([Claude — tool call])
-    IN --> DISPATCH{Tool?}
+    IN([Claude: tool call]) --> D{Tool?}
 
-    DISPATCH -->|wettenbank_zoek|       Z1
-    DISPATCH -->|wettenbank_ophalen|    O1
-    DISPATCH -->|wettenbank_wijzigingen| W1
+    D -->|wettenbank_zoek| Z1
+    D -->|wettenbank_ophalen| O1
+    D -->|wettenbank_wijzigingen| W1
 
-    subgraph SZ [" wettenbank_zoek "]
-        Z1{titel +\ntrefwoord?}
-        Z_TWEE["Stap 1: SRU op titel\nStap 2: XML downloaden\nStap 3: trefwoord in tekst zoeken\nContextfragmenten ± 100 tekens"]
-        Z_EEN["SRU-query CQL\ntitel / rechtsgebied /\nministerie / regelingsoort"]
-        Z_OUT["parseRecords()\ndedupliceerOpBwbId()\nformatRegelingen()"]
-        Z1 -->|"Ja  —  twee-staps"| Z_TWEE --> Z_OUT
-        Z1 -->|"Nee  —  enkel filter"| Z_EEN  --> Z_OUT
-    end
+    Z1{titel en\ntrefwoord?}
+    Z1 -->|Ja: twee-staps| ZA
+    Z1 -->|Nee: enkel filter| ZB
+    ZA["SRU op titel\nXML downloaden\ntrefwoord in tekst zoeken"] --> ZC
+    ZB["SRU-query CQL\ntitel / rechtsgebied\nministerie / soort"] --> ZC
+    ZC["parseRecords\ndedupliceerOpBwbId\nformatRegelingen"]
 
-    subgraph SO [" wettenbank_ophalen "]
-        O1["SRU-lookup\nbwbId + peildatum\n→ repositoryUrl"]
-        O2["GET repository XML\nstripXml() → platte tekst"]
-        O3{Parameter?}
-        O_ART["extraheerArtikelUitXml()\nprimair: DOM-traversal\nfallback: extraheerArtikel()"]
-        O_ZT["Vindplaatsen zoeken\n± 150 tekens context\nmax. 10 fragmenten"]
-        O_FULL["Volledige wetstekst\n~ 50 KB limiet"]
-        O1 --> O2 --> O3
-        O3 -->|artikel|  O_ART
-        O3 -->|zoekterm| O_ZT
-        O3 -->|geen|     O_FULL
-    end
+    O1["SRU-lookup\nbwbId + peildatum"] --> O2
+    O2["GET repository XML\nstripXml"] --> O3
+    O3{Parameter?}
+    O3 -->|artikel| OA["extraheerArtikelUitXml\nfallback: extraheerArtikel"]
+    O3 -->|zoekterm| OB["Vindplaatsen zoeken\n150 tekens context"]
+    O3 -->|geen| OC["Volledige wetstekst\n50 KB limiet"]
 
-    subgraph SW [" wettenbank_wijzigingen "]
-        W1["SRU-query\ndcterms.modified >= sindsdatum\n+ optionele filters"]
-        W2["Sorteren op wijzigingsdatum\ndedupliceerOpBwbId()"]
-        W1 --> W2
-    end
+    W1["SRU-query\ndcterms.modified >= datum"] --> W2
+    W2["Sorteren op datum\ndedupliceerOpBwbId"]
 
-    Z_OUT  --> OUT
-    O_ART  --> OUT
-    O_ZT   --> OUT
-    O_FULL --> OUT
-    W2     --> OUT
+    ZC --> OUT
+    OA --> OUT
+    OB --> OUT
+    OC --> OUT
+    W2 --> OUT
 
-    OUT([Markdown-resultaat\nnaar Claude])
+    OUT([Markdown naar Claude])
 ```
 
 ### Externe endpoints
