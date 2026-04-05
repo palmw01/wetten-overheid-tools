@@ -8,8 +8,9 @@ wettenbank-mcp/dist/
 # Gegenereerde wetsanalyse-rapporten (optioneel meenemen per project)
 # analyses/*.md  # uncomment om gegenereerde rapporten te negeren
 
-# Gegenereerde HTML-renders van rapporten
+# Gegenereerde HTML-renders
 analyses/*.html
+presentaties/*.html
 
 # Sprekersnotities (lokaal gebruik)
 presentaties/*-sprekersnotities.md
