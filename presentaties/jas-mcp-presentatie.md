@@ -306,7 +306,7 @@ style: |
 
 Een workflow die de Invorderingswet 1990 — en elke andere Nederlandse wet — automatisch annoteert, ontleedt en documenteert.
 
-**Wettenbank MCP + JAS v1.0.7 + Claude Code** &nbsp;|&nbsp; Belastingdienst, Domein Inning
+**Wettenbank MCP + JAS v1.0.10 + Claude Code** &nbsp;|&nbsp; Belastingdienst, Domein Inning
 
 ---
 
@@ -319,7 +319,7 @@ Een workflow die de Invorderingswet 1990 — en elke andere Nederlandse wet — 
 2. De oplossing — een end-to-end workflow
 3. Wettenbank MCP — toegang tot wetten.overheid.nl
 4. Technische architectuur van de MCP-server
-5. JAS — Juridisch Analyseschema v1.0.7
+5. JAS — Juridisch Analyseschema v1.0.10
 6. De JAS-workflow stap voor stap
 7. Concreet resultaat — Art. 9 IW 1990
 8. Meerwaarde handmatig vs. geautomatiseerd
@@ -438,7 +438,7 @@ Haalt wetsteksten **direct van wetten.overheid.nl** — geen API-sleutel, CC-0 d
 </div>
 <div class="card">
 
-### JAS v1.0.7
+### JAS v1.0.10
 Classificeert elk zinsdeel in **13 gestandaardiseerde elementen** (MinBZK-standaard, Hohfeld-taxonomie). Interpretatiemethode, delegatieketens, rekenregels — allemaal traceerbaar.
 
 </div>
@@ -616,7 +616,7 @@ Stap 2: Volledige tekst downloaden → trefwoord zoeken met contextfragmenten
 </div>
 <div>
 
-### Juridisch Analyseschema v1.0.7
+### Juridisch Analyseschema v1.0.10
 
 Standaard van het Ministerie van BZK (2024), gebaseerd op de juridische categorietheorie van Hohfeld.
 
@@ -777,7 +777,7 @@ wetten overheid/
 ├── presentaties/             # Deze presentatie
 │
 ├── CLAUDE.md                 # Werkafspraken + BWB-quickref
-├── jas-kaders.md             # JAS v1.0.7 — 13 elementen + herkenningsvragen
+├── jas-kaders.md             # JAS v1.0.10 — 13 elementen + herkenningsvragen
 ├── jas-workflow.md           # Volledige workflow-documentatie
 └── .claude/commands/
     ├── jas.md                # /jas commando (artikel-annotatie)
