@@ -484,11 +484,12 @@ describe("haalWetstekstOp", () => {
     ]));
 
     const { formatted, inhoud } = await haalWetstekstOp("BWBR0002320");
-    expect(formatted).toContain("# Algemene wet inzake rijksbelastingen");
+    expect(formatted).toContain("Algemene wet inzake rijksbelastingen");
+    expect(formatted).toContain("BWBR0002320");
     expect(formatted).toContain("De wetstekst hier");
     expect(inhoud).toBe("De wetstekst hier");
     // inhoud bevat geen header-regels
-    expect(inhoud).not.toContain("**BWB-id:**");
+    expect(inhoud).not.toContain("BWBR0002320");
   });
 });
 

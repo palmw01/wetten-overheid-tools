@@ -351,13 +351,7 @@ export async function haalWetstekstOp(
   }
 
   const formatted = [
-    `# ${r.titel}`,
-    `**BWB-id:** ${r.bwbId} | **Type:** ${r.type}`,
-    `**Ministerie:** ${r.ministerie} | **Rechtsgebied:** ${r.rechtsgebied}`,
-    `**Geldig:** ${r.geldigVanaf} – ${r.geldigTot} | **Gewijzigd:** ${r.gewijzigd}`,
-    `**Bron:** ${r.repositoryUrl}`,
-    "",
-    "---",
+    `**${r.titel}** (${r.bwbId}) — geldig per ${datum}`,
     "",
     inhoud || "(Geen wetstekst beschikbaar)",
   ].join("\n");

@@ -9,3 +9,13 @@ wettenbank-mcp/package-lock.json
 
 # Gegenereerde wetsanalyse-rapporten — groot en on-demand bereikbaar via Glob/Read
 analyses/
+
+# Presentaties — niet relevant voor juridische analyse
+presentaties/
+
+# Referentiedocumentatie — uitsluitend op aanvraag via Read, nooit auto-laden
+jas-workflow.md
+
+# MCP-servercode en package-metadata — niet relevant tijdens JAS-runs
+wettenbank-mcp/src/
+wettenbank-mcp/package.json

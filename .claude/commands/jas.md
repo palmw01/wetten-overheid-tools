@@ -29,17 +29,9 @@ Parseer `$ARGUMENTS` en stel vast:
 
 **Artikelnummer `[A]`**: het nummer na "art." inclusief eventuele letters (9, 25, 36, 2a). Als een specifiek lid is vermeld (bijv. "lid 3"), noteer dit als `[L]`; anders geldt `[L]` = het volledige artikel.
 
-**Wet `[W]` en BWB-id `[B]`**: gebruik de volgende tabel:
+**Wet `[W]` en BWB-id `[B]`**: zie CLAUDE.md §BWB-ids kernbronnen.
 
-| Afkorting in argument | Wet `[W]` | BWB-id `[B]` | Begripsbepalingen |
-|-----------------------|-----------|--------------|-------------------|
-| IW 1990 / IW / Invorderingswet | Invorderingswet 1990 | `BWBR0004770` | Art. 2 |
-| Leidraad / LI | Leidraad Invordering 2008 | `BWBR0024096` | Art. 1 |
-| UB IW / UBIB | Uitvoeringsbesluit IW 1990 | `BWBR0004772` | Art. 1 |
-| AWR | Algemene wet inzake rijksbelastingen | `BWBR0002320` | Art. 1 |
-| Awb | Algemene wet bestuursrecht | `BWBR0005537` | Per hoofdstuk |
-
-Geen herkenbare wet: gebruik IW 1990 (BWBR0004770) als standaard en vermeld dit in het rapport.
+Geen herkenbare wet: gebruik IW 1990 (`BWBR0004770`) als standaard en vermeld dit in het rapport.
 
 Noteer: `[A]`, `[W]`, `[B]`, `[L]`, en het begripsbepalings-artikel `[BD]`.
 
@@ -180,30 +172,13 @@ jas-versie: 1.0.7
 
 ### §1 Wetstekst (letterlijk, geldig per [PD])
 
-Citeer de volledige, letterlijke tekst van artikel `[A]`. Elk lid op een nieuwe regel met vetgedrukt lidnummer. Geen parafrase, geen samenvatting.
-
-Voorbeeld-opmaak:
-```
-**Artikel [A] [wetnaam] — [artikeltitel indien aanwezig]**
-
-> **1** [letterlijke tekst lid 1]
->
-> **2** [letterlijke tekst lid 2]
-```
+Citeer de volledige, letterlijke tekst van artikel `[A]`. Elk lid op een nieuwe regel met vetgedrukt lidnummer (`> **1** ...`). Geen parafrase, geen samenvatting.
 
 ---
 
 ### §2 Structuurdiagram
 
-Breng de interne relaties tussen de leden in kaart: welk lid is de hoofdregel, welke leden zijn afwijkingen, uitzonderingen of nadere invullingen. Gebruik de volgende vaste notatie:
-
-```
-Art. [A] lid 1 — [omschrijving hoofdregel]
-  ├── lid 2 — [afwijking / uitzondering]
-  │     └── lid N — [afwijking op lid 2]
-  ├── lid 3 — [omschrijving]
-  └── lid M — [vangnet / slotbepaling]
-```
+Breng de interne relaties tussen de leden in kaart: welk lid is de hoofdregel, welke leden zijn afwijkingen, uitzonderingen of nadere invullingen. Gebruik een boomstructuur met ├── en └── vertakkingen.
 
 Bij een enkel lid zonder interne structuur: schrijf "Artikel [A] heeft één lid; geen interne structuurverhouding."
 
