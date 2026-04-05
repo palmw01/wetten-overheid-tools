@@ -52,5 +52,5 @@ Naamconventie: `jas-annotatie-[artikel]-[wet]-[timestamp].md`
 
 Voorbeeld: `jas-annotatie-art9-iw1990-2026-04-02_08-57-55.md`
 
-Een JAS-annotatie classificeert elke formulering in het artikel conform het Juridisch Analyseschema v1.0.7.
+Een JAS-annotatie classificeert elke formulering in het artikel conform het Juridisch Analyseschema v1.0.10.
 Zie `jas-kaders.md` voor de volledige annotatiekaders.

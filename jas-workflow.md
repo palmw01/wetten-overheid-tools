@@ -3,7 +3,7 @@
 
 > **Versie:** 1.0.7 · **Vastgesteld:** 7 oktober 2024  
 > **Gebaseerd op:** *Wetsanalyse met het juridisch analyseschema* (MinBZK)  
-> **Canonieke URL:** <https://regels.overheid.nl/standaarden/wetsanalyse/v1.0.7>  
+> **Canonieke URL:** <https://regels.overheid.nl/standaarden/wetsanalyse/v1.0.10>  
 > **Commando:** `/jas <artikel> <wet>` — voorbeeld: `/jas art. 25 IW 1990`
 
 ---
@@ -324,7 +324,7 @@ datum:     [YYYY-MM-DD]
 timestamp: [YYYY-MM-DD_HH-MM-SS]
 peildatum: [peildatum [PD] uit MCP]
 analist:   Belastingdienst — Domein Inning
-jas-versie: 1.0.7
+jas-versie: 1.0.10
 ---
 ```
 
@@ -339,7 +339,7 @@ jas-versie: 1.0.7
 **Analysedatum:**        [DATUM]
 **Peildatum wetstekst:** [PD] ([wet], geldig t/m [vervaldatum uit MCP])
 **Analist:**             Belastingdienst — Domein Inning
-**JAS-versie:**          1.0.7
+**JAS-versie:**          1.0.10
 ```
 
 ---
@@ -810,7 +810,7 @@ Gebruik **altijd `wettenbank_ophalen`** voor inhoudelijke zoekopdrachten.
 
 ## 7  Kleurcodering
 
-> De onderstaande kleurcodes zijn indicatief en gebaseerd op gangbare JAS-implementaties. De officiële JAS-specificatie v1.0.7 schrijft geen vaste kleurwaarden voor.
+> De onderstaande kleurcodes zijn indicatief en gebaseerd op gangbare JAS-implementaties. De officiële JAS-specificatie v1.0.10 schrijft geen vaste kleurwaarden voor.
 
 | JAS-element              | Kleurcode              |
 |--------------------------|------------------------|
@@ -834,7 +834,7 @@ Gebruik **altijd `wettenbank_ophalen`** voor inhoudelijke zoekopdrachten.
 
 | Bron                        | Vindplaats                                                                                    |
 |-----------------------------|-----------------------------------------------------------------------------------------------|
-| JAS v1.0.7 (canoniek)       | <https://regels.overheid.nl/standaarden/wetsanalyse/v1.0.7>                                  |
+| JAS v1.0.7 (canoniek)       | <https://regels.overheid.nl/standaarden/wetsanalyse/v1.0.10>                                  |
 | NL-SBB (begrippenkader)     | <https://docs.geostandaarden.nl/nl-sbb/nl-sbb/>                                              |
 | Hohfeld (1913)              | *Some Fundamental Conceptions as Applied in Judicial Reasoning*, Yale Law Journal 23(1), p. 16–59 |
 | Hohfeld (1917)              | *Fundamental Legal Conceptions as Applied in Judicial Reasoning*, Yale Law Journal 26(8), p. 710–770 |
