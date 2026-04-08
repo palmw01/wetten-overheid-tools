@@ -211,7 +211,7 @@ brondefinitie
 
 ## Kleurcodering (indicatief voor tools)
 
-> **Let op:** De onderstaande kleurcodes zijn gebaseerd op gangbare implementaties van JAS-annotatie­tools. De officiële JAS-specificatie v1.0.10 schrijft geen vaste kleurwaarden voor. 
+> **Let op:** De onderstaande kleurcodes zijn gebaseerd op gangbare implementaties van JAS-annotatie­tools. De officiële JAS-specificatie v1.0.10 schrijft geen vaste kleurwaarden voor.
 
 | Element | Kleurcode | Element | Kleurcode |
 |---------|-----------|---------|-----------|

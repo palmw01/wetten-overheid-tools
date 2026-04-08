@@ -1,145 +1,6 @@
----
-description: Voer een volledige JAS-annotatie (v1.0.10) uit op een wetsbepaling en sla het rapport op als MD-bestand. Gebruik: /jas art. 25 IW 1990 of /jas art. 36 lid 4 IW 1990
----
+# JAS-annotatie — Rapportformat en kwaliteitseisen
 
-# /jas — JAS-annotatie Wetsbepaling
-
-**Artikel:** `$ARGUMENTS`
-
-Voer onderstaande stappen strikt in volgorde uit. Wijk niet af van de voorgeschreven formats.
-
----
-
-## Stap 0 — Bestaande annotatie controleren
-
-Controleer vóór alle overige stappen of er al een annotatie bestaat voor dit artikel:
-
-1. Zoek met `Glob` naar `analyses/jas-annotatie-art[A]-*` (vervang `[A]` met het artikelnummer uit `$ARGUMENTS`).
-2. Als een bestaand rapport gevonden wordt:
-   - Lees het rapport via de Read tool.
-   - Meld aan de gebruiker: "Bestaande annotatie gevonden: [bestandsnaam]. Wetstekst geldig per [peildatum uit frontmatter]. Gebruik je deze als basis of wil je een nieuwe annotatie opstellen?"
-   - **Wacht op bevestiging.** Ga alleen verder met de workflow als de gebruiker een nieuwe annotatie vraagt.
-3. Als geen bestaand rapport gevonden wordt: ga door met Stap 1.
-
----
-
-## Stap 1 — Argument parsen
-
-Parseer `$ARGUMENTS` en stel vast:
-
-**Artikelnummer `[A]`**: het nummer na "art." inclusief eventuele letters (9, 25, 36, 2a). Als een specifiek lid is vermeld (bijv. "lid 3"), noteer dit als `[L]`; anders geldt `[L]` = het volledige artikel.
-
-**Wet `[W]` en BWB-id `[B]`**: zie CLAUDE.md §BWB-ids kernbronnen.
-
-Geen herkenbare wet: gebruik IW 1990 (`BWBR0004770`) als standaard en vermeld dit in het rapport.
-
-Noteer: `[A]`, `[W]`, `[B]`, `[L]`, en het begripsbepalings-artikel `[BD]`.
-
----
-
-## Stap 2 — Wetstekst ophalen en artikelen extraheren
-
-**Parallel aanroepen via MCP:**
-
-Roep tegelijk aan:
-- `wettenbank_ophalen(bwbId=[B], artikel=[A])` — te annoteren artikel
-- `wettenbank_ophalen(bwbId=[B], artikel=[BD])` — begripsbepalingen
-
-Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. Noteer de peildatum `[PD]` en geldigheidsdatum uit de metadata. Noteer de volledige letterlijke wetstekst van artikel `[A]` inclusief het hoofdstuk/de afdeling. Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
-
----
-
-## Stap 3 — Art. 1 IW 1990 extraheren voor Awb-check (conditioneel)
-
-**Alleen als `[W]` = Invorderingswet 1990 of Uitvoeringsbesluit IW 1990:**
-
-Roep aan: `wettenbank_ophalen(bwbId="BWBR0004770", artikel="1")` — tenzij `[A]` = 1 (dan is de tekst al beschikbaar uit Stap 2). De tekst staat direct in het tool-resultaat. Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
-
-**Leidraad Invordering 2008 ophalen via MCP (verplicht bij IW 1990 en UB IW)**
-
-Roep aan: `wettenbank_ophalen(bwbId="BWBR0024096", artikel=[A])` — het Leidraad-artikel met hetzelfde nummer als het te annoteren artikel staat direct in het tool-resultaat. De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport. Bij 0 resultaat (geen overeenkomstig Leidraad-artikel): noteer dit en sla §8 over.
-
-**Als `[W]` ≠ IW 1990 en ≠ UB IW:** sla Stap 3 over.
-
----
-
-## Stap 4 — Kruisreferenties extraheren
-
-Scan de in Stap 2b verkregen artikeltekst op expliciete verwijzingen. Neem uitsluitend verwijzingen op die **letterlijk in de tekst staan** als "artikel X", "artikel X, lid Y", "artikel X, onderdeel Y". Geen verwijzingen toevoegen op basis van eigen kennis.
-
-Maak twee lijsten:
-- **Intern**: verwijzingen naar artikelen binnen dezelfde wet `[W]` — extraheer via Bash uit `[JSON_IW]`
-- **Extern**: verwijzingen naar artikelen in andere wetten
-
-Voor **externe** verwijzingen: gebruik `wettenbank_ophalen(bwbId=<id>, artikel=<nr>)` per gerefereerd artikel. Dit werkt ook voor Awb-artikelen in hfst. 4-10 die onbereikbaar zijn bij volledige opvraging. Roep alle externe artikelen parallel aan.
-
----
-
-## Stap 5 — JAS-annotatie uitvoeren
-
-Gebruik de definities, herkenningsvragen en taalkenmerken uit `jas-kaders.md`. Voer de annotatie uit op de wetstekst van artikel `[A]` uit Stap 2a, aangevuld met de brondefinities uit Stap 2b.
-
-**Interne annotatiestap (niet opnemen in rapportoutput):** loop de 13 JAS-elementen af en bepaal per element of het aanwezig is in het artikel: rechtssubject, rechtsobject, rechtsbetrekking, rechtsfeit, voorwaarde, afleidingsregel, variabele/variabelewaarde, parameter/parameterwaarde, operator, tijdsaanduiding, plaatsaanduiding, delegatiebevoegdheid/delegatie-invulling, brondefinitie. Noteer per aanwezig element de vindplaats in het artikel.
-
-**Annotatieprincipes:**
-1. Citeer het exacte zinsdeel letterlijk bij elk geclassificeerd element.
-2. Kies altijd de meest specifieke JAS-klasse: tijdsaanduiding > variabele; plaatsaanduiding > parameter.
-3. Benoem per JAS-element de interpretatiemethode: grammaticaal / systematisch / teleologisch.
-4. Markeer meerduidigheid of alternatieve classificaties expliciet in de toelichting.
-5. Traceer delegatieketens volledig: wet → amvb → ministeriële regeling.
-
-**Structuur van de annotatietabel:** maak één subsectie per lid van het artikel. Nummer de annotaties doorlopend over alle leden. Gebruik als kolomnamen: Nr | Formulering (letterlijk geciteerd) | JAS-element | Toelichting.
-
-**Inhoud van de Toelichting-kolom:**
-1. Interpretatiemethode (grammaticaal / systematisch / teleologisch)
-2. Reden voor keuze van deze JAS-klasse boven alternatieven
-3. Meerduidigheid of alternatieve classificatie (indien van toepassing)
-
----
-
-## Stap 6 — Afleidingsregels en rekenstructuur uitwerken
-
-Op basis van de in Stap 5 geclassificeerde afleidingsregels:
-
-**Beslisregels:** stel per beslisregel de voorwaardenstructuur op (EN/OF/NIET), de uitvoervariabele (ja/nee) en de vindplaats.
-
-**Rekenregels:** stel per rekenregel de formule op met invoervariabelen, uitvoervariabele en vindplaats. Geef een cijfervoorbeeld als de rekenregel niet-triviaal is.
-
-**Parameters:** noteer alle vaste waarden die voor alle rechtssubjecten gelijk zijn (tarieven, termijnen, percentages, drempelbedragen).
-
----
-
-## Stap 7 — Awb-toepasselijkheidscheck (conditioneel)
-
-**Alleen als `[W]` = IW 1990:** stel per gevonden Awb-artikel (Stap 4, extern) vast of de betreffende Awb-titel van toepassing is op grond van art. 1 lid 2 IW 1990 (Stap 3b). Citeer art. 1 lid 2 letterlijk. Vermeld per Awb-titel: van toepassing / uitgesloten / geen expliciete uitzondering met reden.
-
-**Als `[W]` ≠ IW 1990:** sla Stap 7 over.
-
----
-
-## Stap 8 — Timestamp ophalen en rapport opslaan
-
-Haal de timestamp op via `date +%Y-%m-%d_%H-%M-%S`. Sla het rapport op als:
-
-```
-analyses/jas-annotatie-art[A]-[afkorting wet]-[TIMESTAMP].md
-```
-
-Voorbeelden:
-- `analyses/jas-annotatie-art25-IW1990-2026-04-02_14-30-00.md`
-- `analyses/jas-annotatie-art36lid4-IW1990-2026-04-02_14-30-00.md`
-
-Regels voor de bestandsnaam: geen spaties; "art. " → "art"; "lid " → "lid"; IW 1990 → "IW1990"; AWR → "AWR"; Awb → "Awb".
-
----
-
-## Rapportformat (elk veld verplicht, volgorde onwijzigbaar)
-
-Genereer het rapport conform de onderstaande structuur. De sectienummers en koppen zijn exact en mogen niet worden gewijzigd.
-
----
-
-### Frontmatter (YAML)
+## Frontmatter (YAML)
 
 ```
 ---
@@ -148,7 +9,7 @@ artikel: [volledige artikelreferentie, bijv. Art. 25 IW 1990]
 wet: [volledige wetnaam (BWB-id)]
 datum: [YYYY-MM-DD]
 timestamp: [YYYY-MM-DD_HH-MM-SS]
-peildatum: [peildatum [PD] uit MCP]
+peildatum: [peildatum uit MCP]
 analist: Belastingdienst — Domein Inning
 jas-versie: 1.0.10
 ---
@@ -156,7 +17,7 @@ jas-versie: 1.0.10
 
 ---
 
-### Rapportheader
+## Rapportheader
 
 ```
 # JAS-annotatie: [Volledige artikelreferentie]
@@ -170,13 +31,13 @@ jas-versie: 1.0.10
 
 ---
 
-### §1 Wetstekst (letterlijk, geldig per [PD])
+## §1 Wetstekst (letterlijk, geldig per [PD])
 
 Citeer de volledige, letterlijke tekst van artikel `[A]`. Elk lid op een nieuwe regel met vetgedrukt lidnummer (`> **1** ...`). Geen parafrase, geen samenvatting.
 
 ---
 
-### §2 Structuurdiagram
+## §2 Structuurdiagram
 
 Breng de interne relaties tussen de leden in kaart: welk lid is de hoofdregel, welke leden zijn afwijkingen, uitzonderingen of nadere invullingen. Gebruik een boomstructuur met ├── en └── vertakkingen.
 
@@ -184,9 +45,9 @@ Bij een enkel lid zonder interne structuur: schrijf "Artikel [A] heeft één lid
 
 ---
 
-### §3 Brondefinities
+## §3 Brondefinities
 
-Citeer alle begripsomschrijvingen (uit Stap 2b) die betrekking hebben op termen in artikel `[A]`. Elke definitie letterlijk geciteerd.
+Citeer alle begripsomschrijvingen (uit het begripsbepalings-artikel) die betrekking hebben op termen in artikel `[A]`. Elke definitie letterlijk geciteerd.
 
 | Term | Definitie (letterlijk geciteerd) | Vindplaats | Reikwijdte |
 |------|----------------------------------|------------|------------|
@@ -196,7 +57,7 @@ Bij geen relevante brondefinities: schrijf exact "Geen brondefinities van toepas
 
 ---
 
-### §4 JAS-annotatie per lid
+## §4 JAS-annotatie per lid
 
 Schrijf boven de tabel exact deze leeswijzer:
 
@@ -229,11 +90,13 @@ Na het laatste lid: voeg toe:
 | [omschrijving] | Art. [A] lid Y | Verplicht / Facultatief | [naam regeling] | Art. Z [regeling] |
 ```
 
+De sectienummering is dynamisch: bij N leden is de delegatiestructuur §4.(N+1).
+
 Bij geen delegatie: schrijf exact "Geen delegatiebevoegdheden in artikel [A]."
 
 ---
 
-### §5 Afleidingsregels en rekenstructuur
+## §5 Afleidingsregels en rekenstructuur
 
 **§5.1 Beslisregels**
 
@@ -261,7 +124,7 @@ Bij geen parameters: schrijf exact "Geen parameters in artikel [A]."
 
 ---
 
-### §6 Termijnen en tijdsaanduidingen
+## §6 Termijnen en tijdsaanduidingen
 
 | Termijn / Tijdstip | Duur / Datum | Aanvang | Einde | Rechtsgevolg | Vindplaats |
 |-------------------|-------------|---------|-------|-------------|------------|
@@ -271,7 +134,7 @@ Bij geen termijnen: schrijf exact "Geen termijnen in artikel [A]."
 
 ---
 
-### §7 Kruisreferenties
+## §7 Kruisreferenties
 
 **§7.1 Interne verwijzingen (binnen [wetnaam])**
 
@@ -301,7 +164,7 @@ Bij geen Awb-verwijzingen in artikel [A]: schrijf exact "Artikel [A] bevat geen 
 
 ---
 
-### §8 Beleidskader: Leidraad Invordering *(alleen opnemen als `[W]` = IW 1990 of UB IW)*
+## §8 Beleidskader: Leidraad Invordering *(alleen opnemen als `[W]` = IW 1990 of UB IW)*
 
 Citeer de gevonden Leidraad-bepalingen letterlijk als blokcitaat.
 
@@ -311,13 +174,13 @@ Citeer de gevonden Leidraad-bepalingen letterlijk als blokcitaat.
 
 **Beleidsrelevantie:** [één alinea: hoe vult de Leidraad de wettelijke bepaling aan of in?]
 
-Bij 0 resultaten: schrijf exact de standaardmelding uit Stap 3a.
+Bij 0 resultaten: schrijf exact "De Leidraad Invordering 2008 bevat geen overeenkomstig artikel [A]. §8 wordt weggelaten."
 
-*Sectie §8 wordt weggelaten als `[W]` ≠ IW 1990 en `[W]` ≠ UB IW. De secties §9–§12 nummeren niet door; gebruik altijd de nummers §9–§12 zoals hieronder.*
+*Sectie §8 wordt weggelaten als `[W]` ≠ IW 1990 en `[W]` ≠ UB IW. De secties §9–§11 nummeren niet door; gebruik altijd de nummers §9–§11 zoals hieronder.*
 
 ---
 
-### §9 Juridische analyse
+## §9 Juridische analyse
 
 **§9.1 Grammaticale interpretatie**
 
@@ -343,7 +206,7 @@ Bij geen spanningsvelden: schrijf exact "Op basis van de gevonden wetstekst zijn
 
 ---
 
-### §10 Lacunes en ontbrekend beleid
+## §10 Lacunes en ontbrekend beleid
 
 | Lacune | Omschrijving | Betrokken artikelen | Aanbeveling |
 |--------|-------------|---------------------|-------------|
@@ -353,7 +216,7 @@ Bij geen lacunes: schrijf exact "Geen lacunes geconstateerd binnen het bereik va
 
 ---
 
-### §11 Conclusie
+## §11 Conclusie
 
 **§11.1 Kernbevindingen**
 
@@ -369,19 +232,18 @@ Benoem de resterende onzekerheden en de grenzen van de analyse. Altijd vermelden
 
 ---
 
-### Bijlage A — Aanvullend geraadpleegde artikelen
+## Bijlage A — Aanvullend geraadpleegde artikelen
 
-Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisreferentie zijn geraadpleegd (Stap 4) maar niet centraal staan in §1. Artikelen al geciteerd in §1 worden hier niet herhaald.
+Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisreferentie zijn geraadpleegd maar niet centraal staan in §1. Artikelen al geciteerd in §1 worden hier niet herhaald.
 
-### Bijlage B — Geraadpleegde bronnen
+## Bijlage B — Geraadpleegde bronnen
 
 | Bron | BWB-id | Peildatum (uit MCP) |
 |------|--------|---------------------|
 | [Wetnaam [W]] | [B] | [PD] |
 | [Eventuele externe wet(ten) uit kruisreferenties] | [BWB-id] | [peildatum uit MCP] |
 | Leidraad Invordering 2008 | BWBR0024096 | [peildatum uit MCP] *(alleen bij IW 1990 / UB IW)* |
-| jas-kaders.md | — | [DATUM] |
-| sjabloon-wetsanalyse.md | — | [DATUM] |
+| kaders.md | — | [DATUM] |
 
 ---
 
@@ -390,14 +252,29 @@ Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisrefere
 - **Nooit parafraseren.** Wetstekst altijd letterlijk en volledig citeren in §1, §3, §4 en §8.
 - **Wetstekst lezen voor elke claim.** Snippets zijn nooit voldoende grondslag; altijd de volledige artikeltekst ophalen.
 - **Meest specifieke JAS-klasse.** Tijdsaanduiding boven variabele; plaatsaanduiding boven parameter.
-- **13 JAS-elementen intern afgevinkt.** Alle 13 elementen doorlopen in Stap 5 (interne stap, niet in output).
+- **13 JAS-elementen intern afgevinkt.** Alle 13 elementen doorlopen (interne stap, niet in output).
 - **Kruisreferenties alleen uit de tekst.** Uitsluitend letterlijk in de tekst staande verwijzingen; geen aanvullingen.
-- **Delegatieketens volledig.** Wet → amvb → ministeriële regeling.
+- **Delegatieketens volledig.** Wet → amvb → ministeriële regeling; alle schakels ophalen.
 - **Interpretatiemethode per element.** Grammaticaal / systematisch / teleologisch in elke Toelichting-cel.
 - **Spanning en meerduidigheid.** Altijd expliciet vermelden; bij geen spanning: vaste standaardzin.
 - **Awb-toepasselijkheid.** Bij IW 1990-artikelen altijd §7.3 invullen op basis van art. 1 lid 2 IW 1990.
-- **Leidraad altijd raadplegen.** Bij IW 1990 en UB IW altijd Stap 3a uitvoeren en §8 opnemen.
+- **Leidraad altijd raadplegen.** Bij IW 1990 en UB IW altijd §8 opnemen.
 - **Peildatum uit MCP.** Gebruik de datum die het MCP-resultaat teruggeeft, nooit de datum van vandaag.
 - **MvT-verwijzingen alleen geverifieerd.** Nooit Kamerstukken-verwijzingen fabriceren; altijd "Verificatie vereist" markeren.
 - **Nulresultaat Leidraad: standaardmelding.** Gebruik exact de voorgeschreven tekst.
-- **Altijd opslaan.** Rapport als MD-bestand in `analyses/` conform het bestandsnaamschema in Stap 8.
+- **Altijd opslaan.** Rapport als MD-bestand in `analyses/` conform het bestandsnaamschema.
+
+---
+
+## Pre-save checklist (doorlopen vóór opslaan)
+
+- [ ] §1: wetstekst letterlijk geciteerd, peildatum uit MCP
+- [ ] §4: alle 13 JAS-elementen beoordeeld per lid (afwezig = expliciet vermeld als "n.v.t.")
+- [ ] §4.[N+1]: delegatieketens volledig (alle schakels opgehaald)
+- [ ] §5: beslisregels, rekenregels én parameters aanwezig (of standaardmelding)
+- [ ] §6: alle termijnen met rechtsgevolg bij overschrijding (of standaardmelding)
+- [ ] §7.3: Awb-toepasselijkheid via art. 1 lid 2 IW 1990 (bij IW 1990)
+- [ ] §8: Leidraad letterlijk geciteerd, beleidsruimte benoemd (bij IW 1990/UB IW)
+- [ ] §9: drie interpretatiemethoden doorlopen, spanningsvelden benoemd
+- [ ] §11: onzekerheden expliciet, geen schijnzekerheid
+- [ ] Bestandsnaam conform: `jas-annotatie-art[A]-[wet]-[TIMESTAMP].md`
