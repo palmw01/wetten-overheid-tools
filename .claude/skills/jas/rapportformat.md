@@ -39,7 +39,13 @@ Citeer de volledige, letterlijke tekst van artikel `[A]`. Elk lid op een nieuwe 
 
 ## §2 Structuurdiagram
 
-Breng de interne relaties tussen de leden in kaart: welk lid is de hoofdregel, welke leden zijn afwijkingen, uitzonderingen of nadere invullingen. Gebruik een boomstructuur met ├── en └── vertakkingen.
+Vermeld eerst de structuurpositie van het artikel, **letterlijk uit de `[Structuur: ...]`-prefix in de MCP-response**:
+
+> **Structuurpositie:** [Hoofdstuk X — titel > Afdeling Y — titel > ...]
+
+Als de MCP-response geen `[Structuur: ...]`-prefix bevat: schrijf "Structuurpositie niet beschikbaar in MCP-response." Neem nooit een hoofdstuktitel aan op basis van de artikelinhoud.
+
+Breng daarna de interne relaties tussen de leden in kaart: welk lid is de hoofdregel, welke leden zijn afwijkingen, uitzonderingen of nadere invullingen. Gebruik een boomstructuur met ├── en └── vertakkingen.
 
 Bij een enkel lid zonder interne structuur: schrijf "Artikel [A] heeft één lid; geen interne structuurverhouding."
 
@@ -269,6 +275,7 @@ Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisrefere
 ## Pre-save checklist (doorlopen vóór opslaan)
 
 - [ ] §1: wetstekst letterlijk geciteerd, peildatum uit MCP
+- [ ] §2: structuurpositie (hoofdstuk/afdeling) letterlijk uit `[Structuur: ...]`-prefix MCP-response — nooit aangenomen of afgeleid uit artikelinhoud
 - [ ] §4: alle 13 JAS-elementen beoordeeld per lid (afwezig = expliciet vermeld als "n.v.t.")
 - [ ] §4.[N+1]: delegatieketens volledig (alle schakels opgehaald)
 - [ ] §5: beslisregels, rekenregels én parameters aanwezig (of standaardmelding)

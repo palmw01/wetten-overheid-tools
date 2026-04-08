@@ -276,6 +276,38 @@ describe("extraheerArtikelUitXml", () => {
   it("retourneert null voor niet-bestaand Leidraad-artikel", () => {
     expect(extraheerArtikelUitXml(leidraadXml, "99")).toBeNull();
   });
+
+  it("bevat structuurprefix met officiële hoofdstuktitel", () => {
+    const xml = `<?xml version="1.0"?>
+<wetgeving>
+  <wet-besluit>
+    <wettekst>
+      <hoofdstuk>
+        <kop><label>Hoofdstuk</label><nr>II</nr><titel>Invordering in eerste aanleg</titel></kop>
+        <afdeling>
+          <kop><label>Afdeling</label><nr>1</nr><titel>Betalingstermijnen</titel></kop>
+          <artikel status="geldend">
+            <kop><label>Artikel</label><nr>9</nr><titel>Betalingstermijnen</titel></kop>
+            <al>Een belastingaanslag is invorderbaar zes weken na de dagtekening.</al>
+          </artikel>
+        </afdeling>
+      </hoofdstuk>
+    </wettekst>
+  </wet-besluit>
+</wetgeving>`;
+    const result = extraheerArtikelUitXml(xml, "9");
+    expect(result).toContain("[Structuur:");
+    expect(result).toContain("Invordering in eerste aanleg");
+    expect(result).toContain("Betalingstermijnen");
+    expect(result).toContain("Artikel 9");
+    expect(result).toContain("zes weken");
+  });
+
+  it("geeft geen structuurprefix als het artikel geen ancestor-kop heeft", () => {
+    const result = extraheerArtikelUitXml(ubIwXml, "1");
+    expect(result).not.toContain("[Structuur:");
+    expect(result).toContain("Artikel 1");
+  });
 });
 
 // ── parseRecords ─────────────────────────────────────────────────────────────

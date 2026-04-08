@@ -172,18 +172,27 @@ function getNrValue(nr: unknown): string {
   return "";
 }
 
+interface ArtikelContext {
+  type: string; // "hoofdstuk" | "afdeling" | "paragraaf" | "deel" | "boek"
+  nr: string;
+  titel: string;
+}
+
 interface ArtikelMatch {
   type: "artikel" | "circulaire.divisie";
   node: Record<string, unknown>;
+  context: ArtikelContext[]; // ancestor-keten, buitenste eerst
 }
 
 // Zoekt recursief een artikel-node op basis van artikelnummer.
 // Structurele containers (wettekst, hoofdstuk, paragraaf, …) worden doorzocht;
 // artikel en circulaire.divisie worden gecontroleerd én doorzocht (voor geneste artikelen).
+// Ancestor-keten wordt opgebouwd voor containers met een kop (nr/titel).
 function zoekArtikelInDom(
   node: Record<string, unknown>,
   artikelnummer: string,
-  depth = 0
+  depth = 0,
+  ancestors: ArtikelContext[] = []
 ): ArtikelMatch | null {
   // Voorkom stack overflow bij extreem geneste of malformed XML
   if (depth > 30) return null;
@@ -193,24 +202,34 @@ function zoekArtikelInDom(
     for (const item of items) {
       const kop = item.kop as Record<string, unknown> | undefined;
       if (kop && getNrValue(kop.nr) === artikelnummer) {
-        return { type: key, node: item };
+        return { type: key, node: item, context: ancestors };
       }
-      const found = zoekArtikelInDom(item, artikelnummer, depth + 1);
+      const found = zoekArtikelInDom(item, artikelnummer, depth + 1, ancestors);
       if (found) return found;
     }
   }
-  // Structurele containers (XSD: boek, deel, hoofdstuk, afdeling, paragraaf + wettekst-pad)
-  for (const key of [
-    "boek", "deel", "hoofdstuk", "afdeling", "paragraaf",
-    "wettekst", "wet-besluit", "wetgeving", "circulaire", "tekst",
-  ]) {
+  // Structurele containers met ancestor-tracking voor nodes met kop
+  const structuurContainers = ["boek", "deel", "hoofdstuk", "afdeling", "paragraaf"] as const;
+  const overigeContainers = ["wettekst", "wet-besluit", "wetgeving", "circulaire", "tekst"] as const;
+  for (const key of [...structuurContainers, ...overigeContainers]) {
     const val = node[key];
     if (!val) continue;
     const list = Array.isArray(val)
       ? (val as Record<string, unknown>[])
       : [val as Record<string, unknown>];
     for (const child of list) {
-      const found = zoekArtikelInDom(child, artikelnummer, depth + 1);
+      let childAncestors = ancestors;
+      if ((structuurContainers as readonly string[]).includes(key)) {
+        const kop = child.kop as Record<string, unknown> | undefined;
+        if (kop) {
+          const nr = getNrValue(kop.nr);
+          const titel = kop.titel != null ? stripXml(String(kop.titel)) : "";
+          if (nr || titel) {
+            childAncestors = [...ancestors, { type: key, nr, titel }];
+          }
+        }
+      }
+      const found = zoekArtikelInDom(child, artikelnummer, depth + 1, childAncestors);
       if (found) return found;
     }
   }
@@ -227,11 +246,24 @@ function formatLijst(lijst: Record<string, unknown>): string[] {
 }
 
 function formateerArtikelNode(match: ArtikelMatch): string {
-  const { node } = match;
+  const { node, context } = match;
   const kop = node.kop as Record<string, unknown> | undefined;
   const nr = kop ? getNrValue(kop.nr) : "";
   const titel = kop?.titel != null ? stripXml(String(kop.titel)) : "";
-  const parts: string[] = [titel ? `Artikel ${nr} ${titel}` : `Artikel ${nr}`];
+  const parts: string[] = [];
+  if (context.length > 0) {
+    const prefix = context
+      .map(c => {
+        const label = c.type.charAt(0).toUpperCase() + c.type.slice(1);
+        const nr = c.nr ? ` ${c.nr}` : "";
+        const titel = c.titel ? ` — ${c.titel}` : "";
+        return `${label}${nr}${titel}`;
+      })
+      .join(" > ");
+    parts.push(`[Structuur: ${prefix}]`);
+    parts.push("");
+  }
+  parts.push(titel ? `Artikel ${nr} ${titel}` : `Artikel ${nr}`);
 
   // Directe <al> (artikel zonder lid, of preamble-tekst boven lid-lijst)
   if (node.al != null) {

@@ -62,7 +62,11 @@ Roep tegelijk aan:
 - `wettenbank_ophalen(bwbId=[B], artikel=[A])` — te annoteren artikel
 - `wettenbank_ophalen(bwbId=[B], artikel=[BD])` — begripsbepalingen
 
-Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. Noteer de peildatum `[PD]` en geldigheidsdatum uit de metadata. Noteer de volledige letterlijke wetstekst van artikel `[A]` inclusief het hoofdstuk/de afdeling. Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
+Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. Noteer de peildatum `[PD]` en geldigheidsdatum uit de metadata. Noteer de volledige letterlijke wetstekst van artikel `[A]`.
+
+**Structuurcontext:** de MCP-response bevat boven de artikeltekst een prefix in de vorm `[Structuur: Hoofdstuk X — titel > Afdeling Y — titel]`. Gebruik deze prefix letterlijk voor §1 (structuurpositie in de header) en §2 (Structuurdiagram). **Neem nooit een hoofdstuk- of afdelingstitel aan op basis van de artikelinhoud.** Als de prefix ontbreekt (regex-fallback of wet zonder expliciete structuurlabels): noteer dit expliciet in §2 als "Structuurpositie niet beschikbaar in MCP-response."
+
+Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
 
 **Gebruik altijd de `artikel`-parameter — nooit de volledige wet ophalen.**
 
