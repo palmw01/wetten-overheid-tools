@@ -483,7 +483,7 @@ Achtergrond:
   <div class="pijl">&#8594;</div>
   <div class="stap">JAS-annotatie door Claude Code</div>
   <div class="pijl">&#8594;</div>
-  <div class="stap">Rapport ~4 000 woorden</div>
+  <div class="stap">Rapport ~7 500 woorden</div>
 </div>
 
 <div class="columns">
@@ -503,18 +503,18 @@ Classificeert elk zinsdeel in **13 gestandaardiseerde elementen** (MinBZK-standa
 
 <div class="highlight">
 
-De skill `/jas art9-iw1990` levert in minuten een volledig rapport op: kruisreferenties, parameters, beslisregels, beleidsanalyse, juridische analyse, lacunes en conclusie. **~7 000 woorden.**
+De skill `/jas art9-iw1990` levert in minuten een volledig rapport op: kruisreferenties, parameters, beslisregels, beleidsanalyse, juridische analyse, lacunes en conclusie. **~7 500 woorden.**
 
 </div>
 
 <!--
 Wat je zegt:
-"De oplossing is één skill: /jas gevolgd door het artikelnummer. Die skill triggert de MCP-server om de wetstekst op te halen, geeft die aan Claude Code met de JAS-instructies, en een paar minuten later ligt er een rapport van circa 7000 woorden klaar. Volledig traceerbaar, opgeslagen als Markdown. De executie vindt plaats in een geïsoleerde context — de hoofdconversatie ziet alleen het bestandspad."
+"De oplossing is één skill: /jas gevolgd door het artikelnummer. Die skill triggert de MCP-server om de wetstekst op te halen, geeft die aan Claude Code met de JAS-instructies, en een paar minuten later ligt er een rapport van circa 7500 woorden klaar. Volledig traceerbaar, opgeslagen als Markdown. De executie vindt plaats in een geïsoleerde context — de hoofdconversatie ziet alleen het bestandspad."
 
 Achtergrond:
 - /jas is een skill in Claude Code — een herbruikbaar promptmodule die in een geïsoleerde context (`context: fork`) wordt uitgevoerd. De werkwijze staat in `.claude/skills/jas/SKILL.md`, de taxonomie in `kaders.md` en het rapportformat in `rapportformat.md`.
 - "CC-0 data" betekent dat de inhoud van wetten.overheid.nl rechtenvrij is (publiek domein). Er zijn geen licentiekosten of beperkingen voor gebruik.
-- De output van ~4000 woorden voor Art. 9 is representatief; complexere artikelen (meer leden, meer verwijzingen) kunnen groter uitpakken.
+- De output van ~7500 woorden voor Art. 9 is representatief; complexere artikelen (meer leden, meer verwijzingen) kunnen groter uitpakken.
 -->
 
 ---
@@ -850,7 +850,7 @@ Wat je zegt:
 Achtergrond:
 - `context: fork` is een frontmatter-sleutel in Claude Code skills. Het instrueert de harness om de skill als een subproces te draaien met een eigen contextvenster.
 - Progressive disclosure: de skill laadt bij aanvang SKILL.md (werkwijze), kaders.md (taxonomie) en rapportformat.md (format). Die bestanden worden dus alleen geladen als de skill daadwerkelijk wordt uitgevoerd — niet bij elke conversatie.
-- Token-effect: voor /jas betekent dit dat alle MCP-data en de annotatie zelf (~7000 woorden) niet in de hoofdcontext terechtkomen. Alleen het eindresultaat (bestandspad) komt terug.
+- Token-effect: voor /jas betekent dit dat alle MCP-data en de annotatie zelf (~7500 woorden) niet in de hoofdcontext terechtkomen. Alleen het eindresultaat (bestandspad) komt terug.
 -->
 
 ---
