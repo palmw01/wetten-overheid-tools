@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { escapeerRegex, stripXml, extraheerArtikel, extraheerArtikelUitXml, parseRecords, formatRegelingen, dedupliceerOpBwbId, haalWetstekstOp, sruRequest, vindArtikelContext } from "./index.js";
+import { escapeerRegex, bouwTermPatroon, stripXml, extraheerArtikel, extraheerArtikelUitXml, parseRecords, formatRegelingen, dedupliceerOpBwbId, haalWetstekstOp, sruRequest, vindArtikelContext } from "./index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +79,27 @@ describe("escapeerRegex", () => {
   it("laat gewone tekst ongewijzigd", () => {
     expect(escapeerRegex("25")).toBe("25");
     expect(escapeerRegex("abc")).toBe("abc");
+  });
+});
+
+// ── bouwTermPatroon ──────────────────────────────────────────────────────────
+
+describe("bouwTermPatroon", () => {
+  it("geeft letterlijke term terug zonder wildcard", () => {
+    expect(bouwTermPatroon("termijn")).toBe("termijn");
+  });
+
+  it("converteert wildcard * naar \\w*-suffix", () => {
+    expect(bouwTermPatroon("termijn*")).toBe("termijn\\w*");
+  });
+
+  it("escapet speciale tekens vóór de wildcard", () => {
+    expect(bouwTermPatroon("art. 9*")).toBe("art\\. 9\\w*");
+  });
+
+  it("escapet speciale tekens zonder wildcard", () => {
+    expect(bouwTermPatroon("3:40")).toBe("3:40");
+    expect(bouwTermPatroon("25.1")).toBe("25\\.1");
   });
 });
 
@@ -301,6 +322,44 @@ describe("extraheerArtikelUitXml", () => {
     expect(result).toContain("Betalingstermijnen");
     expect(result).toContain("Artikel 9");
     expect(result).toContain("zes weken");
+  });
+
+  it("bevat structuurprefix als <titel> een status-attribuut heeft (zoals in de echte IW 1990 XML)", () => {
+    const xml = `<?xml version="1.0"?>
+<wetgeving>
+  <wet-besluit>
+    <wettekst>
+      <hoofdstuk>
+        <kop>
+          <label>Hoofdstuk</label>
+          <nr>II</nr>
+          <titel status="officieel">Invordering in eerste aanleg </titel>
+        </kop>
+        <artikel status="geldend">
+          <kop><label>Artikel</label><nr status="officieel">9</nr></kop>
+          <al>Een belastingaanslag is invorderbaar zes weken na de dagtekening.</al>
+        </artikel>
+      </hoofdstuk>
+    </wettekst>
+  </wet-besluit>
+</wetgeving>`;
+    const result = extraheerArtikelUitXml(xml, "9");
+    expect(result).toContain("[Structuur:");
+    expect(result).toContain("Invordering in eerste aanleg");
+    expect(result).not.toContain("[object Object]");
+  });
+
+  it("toont artikeltitel correct als <titel> een status-attribuut heeft", () => {
+    const xml = `<?xml version="1.0"?>
+<wetgeving><wet-besluit><wettekst>
+  <artikel status="geldend">
+    <kop><label>Artikel</label><nr status="officieel">9</nr><titel status="officieel">Betalingstermijnen</titel></kop>
+    <al>Een belastingaanslag is invorderbaar zes weken na de dagtekening.</al>
+  </artikel>
+</wettekst></wet-besluit></wetgeving>`;
+    const result = extraheerArtikelUitXml(xml, "9");
+    expect(result).toContain("Betalingstermijnen");
+    expect(result).not.toContain("[object Object]");
   });
 
   it("geeft geen structuurprefix als het artikel geen ancestor-kop heeft", () => {
@@ -590,6 +649,12 @@ describe("vindArtikelContext", () => {
   it("negeert een artikel dat ná de match staat", () => {
     const tekst = "Hier de match. Artikel 10 staat hierna.";
     expect(vindArtikelContext(tekst, 0)).toBe("");
+  });
+
+  it("herkent Awb-stijl nummers met dubbele punt (bijv. Artikel 3:40)", () => {
+    const tekst = "Artikel 3:40 Een besluit treedt niet in werking. Hier de match.";
+    const matchIndex = tekst.indexOf("Hier de match");
+    expect(vindArtikelContext(tekst, matchIndex)).toBe("Artikel 3:40");
   });
 });
 

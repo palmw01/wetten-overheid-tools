@@ -27,11 +27,11 @@ De Wettenbank MCP-server maakt het mogelijk om **vanuit Claude Code rechtstreeks
 
 **Drie tools zijn beschikbaar:**
 
-| Tool                     | Doel                                                                 |
-|--------------------------|----------------------------------------------------------------------|
-| `wettenbank_zoek`        | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort|
-| `wettenbank_ophalen`     | Volledige wetstekst ophalen via BWB-id; optioneel één specifiek artikel |
-| `wettenbank_wijzigingen` | Gewijzigde regelingen ophalen sinds een opgegeven datum              |
+| Tool                   | Doel                                                                 |
+|------------------------|----------------------------------------------------------------------|
+| `wettenbank_zoek`      | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort; retourneert BWB-id + metadata |
+| `wettenbank_artikel`   | Één specifiek artikel ophalen via BWB-id + artikelnummer; optioneel historische versie via `peildatum` |
+| `wettenbank_zoekterm`  | Zoeken welke artikelen een begrip bevatten; ondersteunt wildcard (`termijn*`) |
 
 ---
 
@@ -49,63 +49,26 @@ Claude Code (LLM)
       │                               └─► XML-response (SRU 2.0)
       │                                       └─► parseRecords() → Regeling[]
       │
-      ├── wettenbank_ophalen ───► SRU-zoekdienst  (stap 1: locatie ophalen)
+      ├── wettenbank_artikel ───► SRU-zoekdienst  (stap 1: locatie ophalen)
       │                               └─► Repository (officiele-overheidspublicaties.nl/bwb/)
       │                                       └─► BWB-toestand XML
       │                                               ├─► extraheerArtikelUitXml() [primair]
-      │                                               ├─► extraheerArtikel()       [fallback]
-      │                                               └─► stripXml() → platte tekst
+      │                                               └─► extraheerArtikel()       [fallback]
       │
-      └── wettenbank_wijzigingen ► SRU-zoekdienst (dcterms.modified >= datum)
-                                      └─► parseRecords() → Regeling[]
+      └── wettenbank_zoekterm ──► SRU-zoekdienst + Repository (zelfde flow als artikel)
+                                      └─► vindArtikelContext() → artikellijst met treffertellingen
 
       ▲  tool result (markdown-tekst over stdout)
       │
 Claude Code (LLM)
 ```
 
-### Processchema
-
-```mermaid
-flowchart TD
-    IN([Claude: tool call]) --> D{Tool?}
-
-    D -->|wettenbank_zoek| Z1
-    D -->|wettenbank_ophalen| O1
-    D -->|wettenbank_wijzigingen| W1
-
-    Z1{titel en\ntrefwoord?}
-    Z1 -->|Ja: twee-staps| ZA
-    Z1 -->|Nee: enkel filter| ZB
-    ZA["SRU op titel\nXML downloaden\ntrefwoord in tekst zoeken"] --> ZC
-    ZB["SRU-query CQL\ntitel / rechtsgebied\nministerie / soort"] --> ZC
-    ZC["parseRecords\ndedupliceerOpBwbId\nformatRegelingen"]
-
-    O1["SRU-lookup\nbwbId + peildatum"] --> O2
-    O2["GET repository XML\nstripXml"] --> O3
-    O3{Parameter?}
-    O3 -->|artikel| OA["extraheerArtikelUitXml\nfallback: extraheerArtikel"]
-    O3 -->|zoekterm| OB["Vindplaatsen zoeken\n150 tekens context"]
-    O3 -->|geen| OC["Volledige wetstekst\n50 KB limiet"]
-
-    W1["SRU-query\ndcterms.modified >= datum"] --> W2
-    W2["Sorteren op datum\ndedupliceerOpBwbId"]
-
-    ZC --> OUT
-    OA --> OUT
-    OB --> OUT
-    OC --> OUT
-    W2 --> OUT
-
-    OUT([Markdown naar Claude])
-```
-
 ### Externe endpoints
 
-| Endpoint                                                         | Gebruik                                      |
-|------------------------------------------------------------------|----------------------------------------------|
-| `https://zoekservice.overheid.nl/sru/Search`                     | SRU 2.0-zoekdienst — alle drie tools         |
-| `https://repository.officiele-overheidspublicaties.nl/bwb/<id>/` | BWB-toestand XML — alleen `wettenbank_ophalen` |
+| Endpoint                                                         | Gebruik                                            |
+|------------------------------------------------------------------|----------------------------------------------------|
+| `https://zoekservice.overheid.nl/sru/Search`                     | SRU 2.0-zoekdienst — alle drie tools               |
+| `https://repository.officiele-overheidspublicaties.nl/bwb/<id>/` | BWB-toestand XML — wettenbank_artikel + zoekterm   |
 
 ### Technische stack
 
@@ -123,29 +86,17 @@ flowchart TD
 
 ### 3.1  `wettenbank_zoek`
 
-Zoekt in het Basiswettenbestand op naam en/of filtert op type, rechtsgebied of ministerie.
+Zoekt in het Basiswettenbestand op naam en/of filtert op type, rechtsgebied of ministerie. Retourneert BWB-id + metadata.
 
 **Parameters:**
 
-| Parameter       | Type   | Verplicht | Omschrijving                                                                              |
-|-----------------|--------|:---------:|-------------------------------------------------------------------------------------------|
-| `titel`         | string |           | Zoekterm in de regelingtitel, bijv. `"Invorderingswet"`                                   |
-| `trefwoord`     | string |           | Gecombineerd met `titel`: zoekt in de volledige wetstekst; zonder `titel` doorzoekt het uitsluitend metadata |
-| `rechtsgebied`  | string |           | Bijv. `"belastingrecht"`, `"arbeidsrecht"`                                                |
-| `ministerie`    | string |           | Bijv. `"Financiën"`, `"Justitie"`                                                         |
-| `regelingsoort` | enum   |           | `wet` · `AMvB` · `ministeriele-regeling` · `regeling` · `besluit`                        |
-| `maxResultaten` | number |           | Maximum aantal resultaten (standaard: 10, maximum: 50)                                    |
-
-**Zoekgedrag per parametercombinatie:**
-
-| Combinatie                        | Gedrag                                                                                  |
-|-----------------------------------|-----------------------------------------------------------------------------------------|
-| alleen `titel`                    | CQL: `overheidbwb.titel any "…"` — zoekt in regelingtitels                             |
-| alleen `trefwoord`                | CQL: `cql.anywhere any "…"` — doorzoekt metadata-velden (zelden nuttig voor juridische begrippen) |
-| `titel` + `trefwoord`             | **Twee-staps:** wet zoeken op titel → volledige XML downloaden → trefwoord zoeken met contextfragmenten |
-| met `rechtsgebied` / `ministerie` | Filtert resultaten via extra CQL-clause                                                 |
-
-> **Aandachtspunt:** `titel` en `trefwoord` worden **nooit** als gecombineerde CQL-query verstuurd — dit veroorzaakt een ongeldige query en HTTP 500. De twee-staps aanpak omzeilt dit correct.
+| Parameter       | Type   | Verplicht | Omschrijving                                                      |
+|-----------------|--------|:---------:|-------------------------------------------------------------------|
+| `titel`         | string |           | Zoekterm in de regelingtitel, bijv. `"Invorderingswet"`           |
+| `rechtsgebied`  | string |           | Bijv. `"belastingrecht"`, `"arbeidsrecht"`                        |
+| `ministerie`    | string |           | Bijv. `"Financiën"`, `"Justitie"`                                 |
+| `regelingsoort` | enum   |           | `wet` · `AMvB` · `ministeriele-regeling` · `regeling` · `besluit`|
+| `maxResultaten` | number |           | Maximum aantal resultaten (standaard: 10, maximum: 50)            |
 
 **Resultaatformaat:**
 
@@ -162,29 +113,19 @@ Query: `<CQL-query>`
 
 ---
 
-### 3.2  `wettenbank_ophalen`
+### 3.2  `wettenbank_artikel`
 
-Haalt de actuele (of historische) wetstekst op voor een BWB-id. Optioneel wordt één specifiek artikel of een zoekterm in de tekst afgehandeld.
+Haalt één artikel op uit een regeling via BWB-id en artikelnummer. De response bevat een `[Structuur: ...]`-prefix met de hiërarchische positie (hoofdstuk/afdeling) wanneer beschikbaar.
 
 **Parameters:**
 
-| Parameter   | Type   | Verplicht | Omschrijving                                                                               |
-|-------------|--------|:---------:|--------------------------------------------------------------------------------------------|
-| `bwbId`     | string | **ja**    | BWB-id van de regeling, bijv. `BWBR0004770`                                                |
-| `peildatum` | string |           | Historische versie op datum `YYYY-MM-DD` (standaard: vandaag)                              |
-| `artikel`   | string |           | Artikelnummer om direct op te halen, bijv. `"3:40"` (Awb) of `"25"` (IW 1990)            |
-| `zoekterm`  | string |           | Zoekt het begrip in de wetstekst; toont vindplaatsen met ±150 tekens context (max. 10)    |
+| Parameter   | Type   | Verplicht | Omschrijving                                                               |
+|-------------|--------|:---------:|----------------------------------------------------------------------------|
+| `bwbId`     | string | **ja**    | BWB-id van de regeling, bijv. `BWBR0004770`                                |
+| `artikel`   | string | **ja**    | Artikelnummer, bijv. `"25"` (IW 1990) of `"3:40"` (Awb)                   |
+| `peildatum` | string |           | Historische versie op datum `YYYY-MM-DD` (standaard: vandaag)              |
 
-**Gedrag per parametervariant:**
-
-| Variant                  | Gedrag                                                                                  |
-|--------------------------|-----------------------------------------------------------------------------------------|
-| alleen `bwbId`           | Volledige wetstekst teruggeven (beperkt tot ~50 KB door SRU-limiet)                     |
-| `bwbId` + `artikel`      | Uitsluitend het gevraagde artikel teruggeven; werkt ook boven de 50 KB-grens            |
-| `bwbId` + `zoekterm`     | Wetstekst ophalen en alle vindplaatsen tonen met contextfragmenten                      |
-| `bwbId` + `peildatum`    | Versie geldig op de opgegeven datum ophalen (historisch)                                |
-
-**Twee-staps gegevensflow bij `artikel`:**
+**Gegevensflow:**
 
 ```
 1. SRU-query: dcterms.identifier==<bwbId> and overheidbwb.geldigheidsdatum==<datum>
@@ -195,44 +136,58 @@ Haalt de actuele (of historische) wetstekst op voor een BWB-id. Optioneel wordt 
    → extraheerArtikel(stripXml(rawXml), artikelnummer) [fallback: tekst-regex]
 ```
 
-**Resultaatformaat (header altijd aanwezig):**
+**Resultaatformaat:**
 
 ```
-# [Wettitel]
-**BWB-id:** BWBR… | **Type:** wet
-**Ministerie:** … | **Rechtsgebied:** …
-**Geldig:** YYYY-MM-DD – YYYY-MM-DD | **Gewijzigd:** YYYY-MM-DD
-**Bron:** https://…
+**[Wettitel]** (BWBR…) — geldig per YYYY-MM-DD
 
 ---
 
-[Artikeltekst of volledige wetstekst of zoekresultaten]
+[Structuur: Hoofdstuk II — Invordering in eerste aanleg > Afdeling 1 — Betalingstermijnen]
+
+Artikel 9 Betalingstermijnen
+1 Een belastingaanslag is invorderbaar zes weken na de dagtekening.
+…
 ```
+
+Geeft `Artikel <nr> **niet gevonden** in deze wet.` als het artikelnummer niet bestaat.
 
 ---
 
-### 3.3  `wettenbank_wijzigingen`
+### 3.3  `wettenbank_zoekterm`
 
-Haalt regelingen op die na een bepaalde datum zijn gewijzigd, gesorteerd op wijzigingsdatum (nieuwste eerst).
+Zoekt welke artikelen een begrip bevatten en retourneert een gesorteerde lijst met treffertellingen en directe aanroepaanwijzingen voor `wettenbank_artikel`.
 
 **Parameters:**
 
-| Parameter       | Type   | Verplicht | Omschrijving                                           |
-|-----------------|--------|:---------:|--------------------------------------------------------|
-| `sindsdatum`    | string | **ja**    | Startdatum `YYYY-MM-DD`, bijv. `"2024-01-01"`          |
-| `rechtsgebied`  | string |           | Bijv. `"belastingrecht"`                               |
-| `ministerie`    | string |           | Bijv. `"Financiën"`                                    |
-| `maxResultaten` | number |           | Maximum aantal resultaten (standaard: 20, maximum: 50) |
+| Parameter   | Type   | Verplicht | Omschrijving                                                                           |
+|-------------|--------|:---------:|----------------------------------------------------------------------------------------|
+| `bwbId`     | string | **ja**    | BWB-id van de regeling, bijv. `BWBR0004770`                                            |
+| `zoekterm`  | string | **ja**    | Te zoeken begrip. Wildcard mogelijk: `"termijn*"` matcht `termijnen`, `termijnoverschrijding` etc. |
+| `peildatum` | string |           | Historische versie op datum `YYYY-MM-DD` (standaard: vandaag)                          |
 
-**CQL-query:** `dcterms.modified >= <sindsdatum> [and filters]`
+**Wildcard:** via `bouwTermPatroon()` — `"termijn*"` → regex `termijn\w*`. Speciale tekens worden eerst geescapet via `escapeerRegex()`.
+
+**Resultaatformaat:**
+
+```
+**[Wettitel]** (BWBR…) — geldig per YYYY-MM-DD
+
+## Zoekresultaten: "dwangbevel" (12x in 4 artikel(en))
+
+- Artikel 13 — 5x  →  `wettenbank_artikel(bwbId="BWBR0004770", artikel="13")`
+- Artikel 14 — 3x  →  `wettenbank_artikel(bwbId="BWBR0004770", artikel="14")`
+- Artikel 15 — 2x  →  `wettenbank_artikel(bwbId="BWBR0004770", artikel="15")`
+- Artikel 16 — 2x  →  `wettenbank_artikel(bwbId="BWBR0004770", artikel="16")`
+```
+
+Geeft `"<zoekterm>" **niet gevonden** in deze wet.` als de term nergens voorkomt.
 
 ---
 
 ## 4  Gegevensmodel
 
 ### Interface `Regeling`
-
-Elke regeling die uit de SRU-response wordt geparsed, heeft de volgende velden:
 
 | Veld           | Type   | XSD-bron (BWB-WTI)                                              | Omschrijving                           |
 |----------------|--------|-----------------------------------------------------------------|----------------------------------------|
@@ -274,55 +229,22 @@ searchRetrieveResponse
 | `parseRecords()`            | ja            | Parsed SRU-XML naar een array van `Regeling`-objecten                   |
 | `dedupliceerOpBwbId()`      | ja            | Behoudt per BWB-id alleen de meest recente versie (op `geldigVanaf`)    |
 | `formatRegelingen()`        | ja            | Formatteert een `Regeling[]` als markdown                               |
-| `haalWetstekstOp()`         | ja            | Combineert SRU-lookup + repository-download + header-opmaak             |
+| `haalWetstekstOp()`         | ja            | Combineert SRU-lookup + repository-download; gebruikt door artikel + zoekterm |
 | `stripXml()`                | ja            | Verwijdert XML-tags, decodeert entities, comprimeert witruimte          |
 | `extraheerArtikelUitXml()`  | ja            | DOM-gebaseerde artikel-extractie uit BWB-toestand XML (primair)         |
 | `extraheerArtikel()`        | ja            | Regex-gebaseerde artikel-extractie uit platte tekst (fallback)          |
-| `vindArtikelContext()`      | ja            | Zoekt de dichtstbijzijnde artikelkop vóór een matchpositie              |
+| `vindArtikelContext()`      | ja            | Zoekt de dichtstbijzijnde artikelkop vóór een matchpositie (incl. `3:40`-stijl) |
 | `escapeerRegex()`           | ja            | Escapet regex-speciale tekens voor veilig gebruik in `RegExp`           |
+| `bouwTermPatroon()`         | ja            | Bouwt regex-patroon: letterlijk of wildcard (`termijn*` → `termijn\w*`) |
 | `zoekArtikelInDom()`        | nee           | Recursieve DOM-traversal voor artikel-lookup (max. diepte: 30)          |
 | `formateerArtikelNode()`    | nee           | Zet een XML-artikelnode om naar platte tekst met lidnummering           |
-| `formatFragmenten()`        | nee           | Formatteert regex-matches als geciteerde fragmenten met artikelcontext  |
 | `vandaag()`                 | nee           | Geeft de huidige datum terug als `YYYY-MM-DD`                           |
 
 ---
 
-### 5.2  `sruRequest(query, maxRecords?)`
+### 5.2  `haalWetstekstOp(bwbId, peildatum?)`
 
-Bouwt een SRU 2.0-verzoek en stuurt het naar de zoekdienst.
-
-```typescript
-// Opgebouwde querystring:
-{
-  operation:        "searchRetrieve",
-  version:          "2.0",
-  "x-connection":   "BWB",
-  query:            <CQL-query>,
-  maximumRecords:   String(maxRecords),
-}
-// GET https://zoekservice.overheid.nl/sru/Search?…
-```
-
-- Gooit `Error("SRU HTTP <status>")` bij een niet-OK HTTP-status.
-- Geeft de ruwe XML-string terug.
-
----
-
-### 5.3  `parseRecords(xml)`
-
-Parsed de SRU-XML met `fast-xml-parser` en mapt elk `<record>`-element naar een `Regeling`-object. Meerdere `<overheidbwb:rechtsgebied>`-elementen worden samengevoegd met komma's.
-
----
-
-### 5.4  `dedupliceerOpBwbId(lijst)`
-
-Bij zoeken zonder datum-filter kunnen meerdere versies van dezelfde regeling worden teruggegeven. Deze functie behoudt per BWB-id alleen de versie met de meest recente `geldigVanaf`-datum via lexicografische vergelijking van ISO-datumstrings.
-
----
-
-### 5.5  `haalWetstekstOp(bwbId, peildatum?)`
-
-De centrale functie van `wettenbank_ophalen`. Voert twee netwerkverzoeken uit:
+Centrale hulpfunctie gedeeld door `wettenbank_artikel` en `wettenbank_zoekterm`. Voert twee netwerkverzoeken uit:
 
 1. **SRU-lookup** — zoekt de regeling op BWB-id en datum; extraheert de `repositoryUrl`.
 2. **Repository-download** — haalt de BWB-toestand XML op van `officiele-overheidspublicaties.nl`.
@@ -331,34 +253,35 @@ Geeft drie waarden terug:
 
 | Returnwaarde | Inhoud                                                                              |
 |--------------|-------------------------------------------------------------------------------------|
-| `formatted`  | Markdown inclusief header (titel, BWB-id, geldigheidsdatum, bron) én wetstekst     |
+| `formatted`  | Markdown inclusief header (titel, BWB-id, geldigheidsdatum) én wetstekst           |
 | `inhoud`     | Uitsluitend de wetstekst, **zonder** header                                         |
 | `rawXml`     | Onbewerkte XML voor DOM-gebaseerde artikel-extractie                                |
 
-> De scheiding tussen `formatted` en `inhoud` is bewust: zoektermen worden uitsluitend in `inhoud` gezocht, zodat woorden die in de header voorkomen (bijv. "belasting" in de wettitel) niet als vindplaats in de wetstekst worden geteld.
+> De scheiding tussen `formatted` en `inhoud` is bewust: zoektermen worden uitsluitend in `inhoud` gezocht, zodat woorden in de header (bijv. "belasting" in de wettitel) niet als vindplaats worden geteld.
 
 ---
 
-### 5.6  `stripXml(xml)`
+### 5.3  `bouwTermPatroon(zoekterm)`
 
-Converteert BWB-toestand XML naar platte tekst:
+Bouwt een regex-patroon voor `wettenbank_zoekterm`:
 
-| Stap | Bewerking                                           |
-|-----:|-----------------------------------------------------|
-|    1 | XML-declaratie (`<?xml … ?>`) verwijderen           |
-|    2 | CDATA-secties uitpakken                             |
-|    3 | Alle XML-tags verwijderen                           |
-|    4 | `&amp;` `&lt;` `&gt;` `&quot;` `&apos;` `&nbsp;` decoderen |
-|    5 | Decimale entities `&#NNN;` decoderen                |
-|    6 | Hexadecimale entities `&#xHH;` decoderen            |
-|    7 | Meerdere opeenvolgende spaties samenvoegen          |
-|    8 | Trimmen                                             |
+| Invoer        | Patroon           | Gedrag                                            |
+|---------------|-------------------|---------------------------------------------------|
+| `"termijn"`   | `termijn`         | Letterlijke match                                 |
+| `"termijn*"`  | `termijn\w*`      | Matcht `termijnen`, `termijnoverschrijding`, e.d. |
+| `"art. 9*"`   | `art\. 9\w*`      | Speciale tekens geescapet vóór wildcard           |
 
 ---
 
-### 5.7  `extraheerArtikelUitXml(rawXml, artikelnummer)`
+### 5.4  `vindArtikelContext(tekst, matchIndex)`
 
-**Primaire** methode voor artikel-extractie. Gebruikt DOM-traversal via `fast-xml-parser` met een configuratie afgestemd op de BWB-toestand XSD.
+Zoekt de dichtstbijzijnde artikelkop **vóór** `matchIndex`. Regex: `/Artikel\s+[\d:]+[a-z]*/gi` — ondersteunt zowel enkelvoudige nummers (`Artikel 25`) als Awb-stijl (`Artikel 3:40`).
+
+---
+
+### 5.5  `extraheerArtikelUitXml(rawXml, artikelnummer)`
+
+**Primaire** methode voor artikel-extractie. Gebruikt DOM-traversal via `fast-xml-parser`.
 
 **Zoekstrategie van `zoekArtikelInDom`:**
 
@@ -368,7 +291,7 @@ Per node (max. diepte 30):
   ├── [circulaire.divisie]   → kop/nr vergelijken; recursief in kinderen zoeken
   └── [structurele containers: boek, deel, hoofdstuk, afdeling, paragraaf,
        wettekst, wet-besluit, wetgeving, circulaire, tekst]
-        → recursief doorzoeken
+        → recursief doorzoeken; hoofdstuk/afdeling toegevoegd aan ancestor-keten
 ```
 
 Ondersteunt twee documenttypen:
@@ -382,38 +305,18 @@ Geeft `null` terug als het artikel niet wordt gevonden of als de XML niet parsee
 
 ---
 
-### 5.8  `extraheerArtikel(tekst, artikelnummer)` *(fallback)*
-
-Splits de platte tekst (output van `stripXml`) op `Artikel \d`-grenzen en selecteert het segment dat begint met het gevraagde artikelnummer. Strips daarna trailing publicatiemetadata (reeksen van `jaar volgnr DD-MM-YYYY`).
-
-Wordt gebruikt wanneer `extraheerArtikelUitXml` `null` teruggeeft.
-
----
-
-### 5.9  `vindArtikelContext(tekst, matchIndex)`
-
-Zoekt alle `Artikel \d+[a-z]*`-posities in de tekst en geeft de dichtstbijzijnde artikelkop **vóór** `matchIndex` terug. Gebruikt door `formatFragmenten` om bij zoekterm-hits te vermelden in welk artikel de vindplaats staat.
-
-Pre-bouwt de artikelposities eenmalig in O(n) zodat elke lookup O(k) is over het posities-array.
-
----
-
 ## 6  XML-schemas
 
 De server laadt geen XSD-bestanden op maar baseert zijn parselogica op twee publieke schemas van `repository.officiele-overheidspublicaties.nl`:
 
 ### 6.1  BWB-toestand/2016-1 (`toestand_2016-1.xsd`)
 
-Beschrijft de XML-structuur van de wetsdocumenten die het repository serveert.
-
-**Invloed op de implementatie:**
-
 | Beslissing                             | XSD-grondslag                                                                        |
 |----------------------------------------|--------------------------------------------------------------------------------------|
-| `isArray`-lijst in `wetParser`         | Elementen met `maxOccurs="unbounded"` moeten als array worden geparsed; anders breekt DOM-traversal bij enkelvoudige kinderen |
+| `isArray`-lijst in `wetParser`         | Elementen met `maxOccurs="unbounded"` moeten als array worden geparsed               |
 | Structurele containers in `zoekArtikelInDom` | `boek`, `deel`, `hoofdstuk`, `afdeling`, `paragraaf`, `wettekst`, `wetgeving` zijn XSD-elementnamen |
 | Veldnamen in `formateerArtikelNode`    | `kop`, `nr`, `al`, `lid`, `lidnr`, `lijst`, `li`, `tekst` zijn XSD-velden           |
-| `stopNodes: ["*.al"]`                  | `<al>` is mixed content (tekst + inline markup als `<intref>`, `<extref>`, `<nadruk>`); `stopNodes` bewaart de ruwe string zodat `stripXml` het inline-markup verwijdert |
+| `stopNodes: ["*.al"]`                  | `<al>` is mixed content; `stopNodes` bewaart de ruwe string voor `stripXml`         |
 
 **`isArray`-lijst:**
 
@@ -424,10 +327,6 @@ Beschrijft de XML-structuur van de wetsdocumenten die het repository serveert.
 ```
 
 ### 6.2  BWB-WTI/2016-1 (`wti_2016-1.xsd`)
-
-Beschrijft de recordstructuur die de SRU-zoekdienst teruggeeft.
-
-**Relevante XSD-paden (gebruikt in `parseRecords`):**
 
 ```
 gzd
@@ -451,8 +350,6 @@ gzd
 
 ## 7  Foutafhandeling
 
-### Tool-niveau
-
 Alle tool-handlers zijn omgeven door een `try/catch`. Bij een fout geeft de server:
 
 ```json
@@ -463,23 +360,14 @@ Alle tool-handlers zijn omgeven door een `try/catch`. Bij een fout geeft de serv
 
 | Situatie                                | Reactie                                                                           |
 |-----------------------------------------|-----------------------------------------------------------------------------------|
-| Onbekend BWB-id (SRU geeft 0 records)   | Fout met vermelding van bekende BWB-ids (IW 1990, AWR, Awb)                       |
+| Onbekend BWB-id (SRU geeft 0 records)   | Fout met vermelding van bekende BWB-ids (IW 1990, AWR, Awb, Leidraad 2008)        |
 | Repository niet bereikbaar (HTTP-fout)  | `inhoud = "(Wetstekst niet bereikbaar: <status>)"` — geen crash                   |
 | Netwerkfout bij repository-fetch        | `inhoud = "(Fout bij ophalen wetstekst)"` — geen crash                            |
 | SRU HTTP-fout                           | `Error("SRU HTTP <status>")` → valt terug op tool-niveau catch                   |
-| Artikel niet gevonden                   | `"Artikel <nr> niet gevonden in deze wet."` in de tekst-output                   |
+| Artikel niet gevonden                   | `"Artikel <nr> **niet gevonden** in deze wet."` in de tekst-output               |
+| Term niet gevonden                      | `"<term>" **niet gevonden** in deze wet.` in de tekst-output                     |
 | DOM-parse fout of lege XML              | `extraheerArtikelUitXml` geeft `null` → fallback naar `extraheerArtikel`         |
 | Recursie-diepte > 30                    | `zoekArtikelInDom` stopt en geeft `null` terug (bescherming tegen stack overflow) |
-
-### Metadata-waarschuwing
-
-Bij gebruik van `trefwoord` zonder `titel` wordt een expliciete waarschuwing in de output opgenomen:
-
-```
-> **Let op — metadata-zoeken:** `trefwoord` zonder `titel` doorzoekt regelingmetadata,
-> niet de wetstekst. Juridische begrippen worden hiermee zelden gevonden.
-> Voor in-tekst zoeken: gebruik `wettenbank_ophalen` met `zoekterm`.
-```
 
 ---
 
@@ -516,8 +404,6 @@ npm run build    # TypeScript compileren → dist/index.js
 
 ### Configuratie voor Claude Code (CLI)
 
-Voeg toe aan `.claude/settings.json` (project) of `~/.claude/settings.json` (globaal):
-
 ```json
 {
   "mcpServers": {
@@ -530,8 +416,6 @@ Voeg toe aan `.claude/settings.json` (project) of `~/.claude/settings.json` (glo
 ```
 
 ### Configuratie voor Claude Desktop
-
-Voeg toe aan `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -564,26 +448,25 @@ Voeg toe aan `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Alle geëxporteerde functies zijn gedekt door unit tests in `src/index.test.ts`:
 
-| Testsuite                         | Getest gedrag                                                               |
-|-----------------------------------|-----------------------------------------------------------------------------|
-| `escapeerRegex`                   | Regex-speciale tekens escapen; gewone tekst ongewijzigd laten               |
-| `stripXml`                        | Tags verwijderen; CDATA uitpakken; entities decoderen; spaties samenvoegen  |
-| `extraheerArtikel`                | Artikel op nummer; dubbele punt (Awb); null-fallback; metadata stripping    |
-| `extraheerArtikelUitXml`          | Reguliere wet; Awb (`:` in nr); Leidraad (`circulaire.divisie`); subartikel; depth-limit; lege XML |
-| `parseRecords`                    | Leeg resultaat; enkelvoudig record; meerdere rechtsgebieden; twee records   |
-| `formatRegelingen`                | Lege lijst; BWB-id/titel aanwezig; oplopende nummering; titel-fallback      |
-| `dedupliceerOpBwbId`              | Unieke ids; meest recente versie bewaren; lege invoer; gemengde invoer      |
+| Testsuite                         | Getest gedrag                                                                       |
+|-----------------------------------|-------------------------------------------------------------------------------------|
+| `escapeerRegex`                   | Regex-speciale tekens escapen; gewone tekst ongewijzigd laten                       |
+| `bouwTermPatroon`                 | Letterlijke term; wildcard `*`-suffix; speciale tekens met wildcard                 |
+| `stripXml`                        | Tags verwijderen; CDATA uitpakken; entities decoderen; spaties samenvoegen          |
+| `extraheerArtikel`                | Artikel op nummer; dubbele punt (Awb); null-fallback; metadata stripping            |
+| `extraheerArtikelUitXml`          | Reguliere wet; Awb (`:` in nr); Leidraad (`circulaire.divisie`); subartikel; structuurprefix; depth-limit; lege XML |
+| `parseRecords`                    | Leeg resultaat; enkelvoudig record; meerdere rechtsgebieden; twee records           |
+| `formatRegelingen`                | Lege lijst; BWB-id/titel aanwezig; oplopende nummering; titel-fallback              |
+| `dedupliceerOpBwbId`              | Unieke ids; meest recente versie bewaren; lege invoer; gemengde invoer              |
 | `haalWetstekstOp`                 | Peildatum vandaag/historisch; onbekend BWB-id; HTTP-fout; netwerkfout; `formatted` vs. `inhoud` |
-| Zoekterm in `inhoud`              | Woord in header telt niet mee; vindplaatsen in wetstekst correct            |
-| `vindArtikelContext`              | Dichtstbijzijnde artikel vóór match; geen artikel aanwezig; letterachtervoegsel |
-| `sruRequest`                      | HTTPS-gebruik; HTTP-foutcode; correcte tekst teruggeven                     |
+| Zoekterm in `inhoud`              | Woord in header telt niet mee; vindplaatsen in wetstekst correct                    |
+| `vindArtikelContext`              | Dichtstbijzijnde artikel; geen artikel; letterachtervoegsel; Awb-stijl (`3:40`)     |
+| `sruRequest`                      | HTTPS-gebruik; HTTP-foutcode; correcte tekst teruggeven                             |
 
 ### Bekende beperkingen
 
 | Beperking                       | Toelichting                                                                                     |
 |---------------------------------|-------------------------------------------------------------------------------------------------|
-| 50 KB-limiet zonder `artikel`   | Volledige wetstekst is beperkt tot ~50 KB; gebruik de `artikel`-parameter voor grote wetten     |
 | Vervallen artikelen gefilterd   | De SRU-dienst retourneert alleen geldende artikelen; gaten in de nummering zijn normaal         |
 | EU-verordeningen niet beschikbaar | Documenten zoals het Douanewetboek van de Unie zijn niet opgenomen in het BWB                |
-| Leidraad-subartikelen           | Subartikelen (bijv. `25.1`) zijn bereikbaar via de `artikel`-parameter; de preview van het hoofdartikel toont uitsluitend de inleidende tekst |
-| Twee-staps zoeken               | Bij `titel` + `trefwoord` wordt maximaal 1 wet volledig gedownload; voor meerdere wetten zijn meerdere aanroepen nodig |
+| Leidraad-subartikelen           | Subartikelen (bijv. `25.1`) zijn bereikbaar via `wettenbank_artikel`; het hoofdartikel toont uitsluitend de inleidende tekst |

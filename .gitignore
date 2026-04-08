@@ -5,8 +5,8 @@ wettenbank-mcp/dist/
 # Lokale Claude Code instellingen (machine-specifiek)
 .claude/settings.local.json
 
-# Gegenereerde wetsanalyse-rapporten (optioneel meenemen per project)
-# analyses/*.md  # uncomment om gegenereerde rapporten te negeren
+# Gegenereerde wetsanalyse-rapporten — on-demand, niet in versiebeheer
+analyses/*.md
 
 # Gegenereerde HTML-renders
 analyses/*.html

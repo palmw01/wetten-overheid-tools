@@ -8,16 +8,12 @@ Werkruimte voor gestructureerde wetsanalyse op het domein **invordering van rijk
 
 ```
 wettenbank-mcp/                    MCP-server: koppelt Claude aan wetten.overheid.nl
-analyses/                          Gegenereerde wetsanalyserapporten en JAS-annotaties
+analyses/                          Gegenereerde JAS-annotaties
 CLAUDE.md                          Werkafspraken voor Claude (rol, betrouwbaarheidsregels)
-.claude/skills/
-  jas/
+.claude/skills/jas/
     SKILL.md                       /jas skill — werkwijze stap 0–10, MCP-strategie (context:fork)
     kaders.md                      JAS v1.0.10 — 13 annotatiekaders + taxonomie
     rapportformat.md               §1–§11 structuur + pre-save checklist
-  wetzoek/
-    SKILL.md                       /wetzoek skill — werkwijze stap 0–9 (context:fork)
-    rapportformat.md               §1–§5 structuur + pre-save checklist
 ```
 
 De skills draaien in een geïsoleerde fork-context (`context: fork`): alle MCP-aanroepen, wetstekst en analyse blijven buiten de hoofdconversatie. De hoofdconversatie ontvangt alleen het bestandspad van het opgeslagen rapport.
@@ -30,9 +26,9 @@ De [`wettenbank-mcp`](./wettenbank-mcp/) server stelt drie tools beschikbaar voo
 
 | Tool | Omschrijving |
 |------|-------------|
-| `wettenbank_zoek` | Zoek op titel, rechtsgebied, ministerie of regelingsoort |
-| `wettenbank_ophalen` | Volledige wetstekst via BWB-id; optioneel: `artikel` (direct één artikel ophalen), `zoekterm` (vindplaatsen), `peildatum` (historische versie) |
-| `wettenbank_wijzigingen` | Gewijzigde regelingen sinds datum X |
+| `wettenbank_zoek` | Naam → BWB-id + metadata (puur SRU-metadata) |
+| `wettenbank_artikel` | BWB-id + artikelnummer → artikeltekst met structuurcontext; optioneel `peildatum` |
+| `wettenbank_zoekterm` | BWB-id + zoekterm → welke artikelen bevatten de term; wildcard `termijn*` mogelijk |
 
 **Geen API-sleutel nodig.** De server koppelt direct aan de publieke SRU-interface van KOOP; alle data is CC-0.
 
@@ -56,40 +52,6 @@ Voeg toe aan `claude_desktop_config.json` (Claude Desktop) of aan `.claude/setti
   }
 }
 ```
-
----
-
-## Wetsanalyse met `/wetzoek`
-
-De skill `/wetzoek` doorzoekt automatisch vijf kernbronnen en genereert een volledig gestructureerd rapport:
-
-```
-/wetzoek termijnen
-/wetzoek aansprakelijkheid
-/wetzoek uitstel van betaling
-/wetzoek dwangbevel
-```
-
-### Doorzochte bronnen
-
-| Bron | BWB-id |
-|------|--------|
-| Invorderingswet 1990 | `BWBR0004770` |
-| Leidraad Invordering 2008 | `BWBR0024096` |
-| Uitvoeringsbesluit Invorderingswet 1990 | `BWBR0004772` |
-| Algemene wet inzake rijksbelastingen (AWR) | `BWBR0002320` |
-| Algemene wet bestuursrecht (Awb) | `BWBR0005537` |
-
-### Rapportinhoud
-
-Elk rapport bevat:
-1. **Statistieken** — treffers per bron, artikelnummers, gezochte morfologische varianten
-2. **Vindplaatsen** — letterlijke wetstekst per artikel (nooit parafrase)
-3. **Kruisreferenties** — intern (binnen wet) en extern (naar andere wet), incl. Awb-toepasselijkheidscheck via art. 1 lid 2 IW 1990
-4. **Juridische samenvatting** — betekenis, samenhang, spanningsvelden, praktijkaandachtspunten, jurisprudentie
-5. **Bronnen** — per bron met geldigheidsdatum (peildatum)
-
-Rapporten worden opgeslagen in [`analyses/`](./analyses/) met de naamconventie `[zoekterm]-[timestamp].md`.
 
 ---
 

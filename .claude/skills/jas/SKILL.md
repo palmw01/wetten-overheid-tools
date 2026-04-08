@@ -59,8 +59,8 @@ Noteer: `[A]`, `[W]`, `[B]`, `[L]`, en het begripsbepalings-artikel `[BD]`.
 **Parallel aanroepen via MCP:**
 
 Roep tegelijk aan:
-- `wettenbank_ophalen(bwbId=[B], artikel=[A])` — te annoteren artikel
-- `wettenbank_ophalen(bwbId=[B], artikel=[BD])` — begripsbepalingen
+- `wettenbank_artikel(bwbId=[B], artikel=[A])` — te annoteren artikel
+- `wettenbank_artikel(bwbId=[B], artikel=[BD])` — begripsbepalingen
 
 Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. Noteer de peildatum `[PD]` en geldigheidsdatum uit de metadata. Noteer de volledige letterlijke wetstekst van artikel `[A]`.
 
@@ -77,8 +77,8 @@ Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in 
 **Alleen als `[W]` = Invorderingswet 1990 of Uitvoeringsbesluit IW 1990:**
 
 Roep parallel aan:
-- `wettenbank_ophalen(bwbId="BWBR0004770", artikel="1")` — tenzij `[A]` = 1 (dan al beschikbaar uit Stap 3). Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
-- `wettenbank_ophalen(bwbId="BWBR0024096", artikel=[A])` — het Leidraad-artikel met hetzelfde nummer als het te annoteren artikel. De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport. Bij 0 resultaat: noteer dit en sla §8 over.
+- `wettenbank_artikel(bwbId="BWBR0004770", artikel="1")` — tenzij `[A]` = 1 (dan al beschikbaar uit Stap 3). Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
+- `wettenbank_artikel(bwbId="BWBR0024096", artikel=[A])` — het Leidraad-artikel met hetzelfde nummer als het te annoteren artikel. De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport. Bij 0 resultaat: noteer dit en sla §8 over.
 
 **Nooit:** `BWBR0004800` (Leidraad invordering 1990, verlopen per 2005-07-12).
 
@@ -94,7 +94,7 @@ Maak twee lijsten:
 - **Intern**: verwijzingen naar artikelen binnen dezelfde wet `[W]`
 - **Extern**: verwijzingen naar artikelen in andere wetten
 
-Voor **externe** verwijzingen: gebruik `wettenbank_ophalen(bwbId=<id>, artikel=<nr>)` per gerefereerd artikel. Roep alle externe artikelen parallel aan.
+Voor **externe** verwijzingen: gebruik `wettenbank_artikel(bwbId=<id>, artikel=<nr>)` per gerefereerd artikel. Roep alle externe artikelen parallel aan.
 
 BWB-ids: IW 1990 = BWBR0004770 | UB IW = BWBR0004772 | AWR = BWBR0002320 | Awb = BWBR0005537 | Leidraad 2008 = BWBR0024096
 

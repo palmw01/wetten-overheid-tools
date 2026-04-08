@@ -23,29 +23,17 @@ The entire server lives in `src/index.ts`. It exposes three tools:
 
 | Tool | Purpose |
 |------|---------|
-| `wettenbank_zoek` | Search by title, rechtsgebied, ministerie, or regelingsoort; two-step full-text search when both `titel` and `trefwoord` are given |
-| `wettenbank_ophalen` | Fetch full text of a regulation by BWB-id; optional `artikel` to fetch one specific article directly (bypasses 50KB limit), optional `zoekterm` to find occurrences within the text |
-| `wettenbank_wijzigingen` | List regulations changed since a given date |
+| `wettenbank_zoek` | Search by title, rechtsgebied, ministerie, or regelingsoort — returns BWB-id + metadata |
+| `wettenbank_artikel` | Fetch one specific article by BWB-id + article number; optional `peildatum` for historical version |
+| `wettenbank_zoekterm` | Find which articles in a regulation contain a term; supports wildcard (`termijn*`); returns article list with hit counts and ready-to-use `wettenbank_artikel` calls |
 
-**Data flow:** Claude calls a tool → tool handler builds a CQL query → `sruRequest()` hits the SRU endpoint → XML parsed with `fast-xml-parser` → `parseRecords()` extracts `Regeling` objects → formatted as markdown and returned to Claude.
+**Data flow (wettenbank_zoek):** builds CQL query → `sruRequest()` hits SRU endpoint → XML parsed → `parseRecords()` + `dedupliceerOpBwbId()` → formatted as markdown.
 
-For `wettenbank_ophalen`, there's an extra step: after finding the regulation via SRU, it fetches the full XML from `repository.officiele-overheidspublicaties.nl/bwb/` and strips it to plain text via `stripXml()`. When `artikel` is given, only that article's XML node is extracted before stripping, keeping the response small regardless of regulation size.
+**Data flow (wettenbank_artikel / wettenbank_zoekterm):** `haalWetstekstOp()` fetches regulation via SRU, then fetches full XML from `repository.officiele-overheidspublicaties.nl/bwb/` and strips to plain text via `stripXml()`. For `wettenbank_artikel`, `extraheerArtikelUitXml()` extracts the single article XML node before stripping. For `wettenbank_zoekterm`, `vindArtikelContext()` groups matches by nearest article header.
 
-### `wettenbank_zoek` — zoekgedrag
+### `wettenbank_zoekterm` — wildcard
 
-| Parameters | Gedrag |
-|------------|--------|
-| alleen `titel` | CQL: `overheidbwb.titel any "…"` |
-| alleen `trefwoord` | CQL: `cql.anywhere any "…"` (alle geïndexeerde velden) |
-| `titel` + `trefwoord` samen | Twee-staps: wet ophalen op titel → volledige tekst downloaden → trefwoord zoeken met context-fragmenten |
-
-> **Let op:** gebruik `titel` + `trefwoord` nooit samen als enkelvoudige CQL-query — dit was een bug die een ongeldige query en HTTP 500 veroorzaakte. De twee-staps aanpak omzeilt dit correct.
-
-### `wettenbank_ophalen` — artikel en zoekterm
-
-Optionele parameter `artikel`: geeft uitsluitend het gevraagde artikel terug (bijv. `"3:40"` voor Awb, `"25"` voor IW 1990). Efficiënter dan de volledige wet ophalen en werkt ook voor artikelen voorbij de 50KB-grens.
-
-Optionele parameter `zoekterm`: na het ophalen van de wetstekst worden alle vindplaatsen (max. 10 fragmenten van ±150 tekens context) teruggegeven.
+Zoekterm die eindigt op `*` wordt omgezet naar een regex-suffix `\w*` via `bouwTermPatroon()`: `termijn*` → matcht `termijn`, `termijnen`, `termijnoverschrijding`. Speciale tekens worden vooraf geescapet via `escapeerRegex()`.
 
 ### XML-schemas als ontwerpbasis
 

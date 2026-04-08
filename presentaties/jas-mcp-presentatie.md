@@ -538,9 +538,9 @@ Wat je zegt:
 
 | Tool | Doel | Voorbeeld |
 |------|------|-----------|
-| `wettenbank_zoek` | Vind wetten op naam, rechtsgebied, type | Zoek alle AMvB's onder IW 1990 |
-| `wettenbank_ophalen` | Haal wet of specifiek artikel op; zoek termen; historische versies via peildatum | `artikel="9"`, `bwbId="BWBR0004770"` |
-| `wettenbank_wijzigingen` | Gewijzigde regelingen sinds datum X | Impact-analyse bij wetswijziging |
+| `wettenbank_zoek` | Vind wetten op naam, rechtsgebied, type — retourneert BWB-id + metadata | Zoek alle AMvB's onder IW 1990 |
+| `wettenbank_artikel` | Haal per aanroep één artikel op; voor meerdere artikelen: parallelle aanroepen. | `artikel="9"`, `bwbId="BWBR0004770"` |
+| `wettenbank_zoekterm` | Zoek artikelen met een begrip binnen één wet; voor meerdere wetten: parallelle aanroepen; wildcard mogelijk | `zoekterm="dwangbevel*"`, `bwbId="BWBR0004770"` |
 
 <div class="columns">
 <div class="card">
@@ -559,13 +559,13 @@ Elke aanroep retourneert een **peildatum**. Versies raadpleegbaar tot ver voor d
 
 <!--
 Wat je zegt:
-"MCP — Model Context Protocol — is een open standaard van Anthropic waarmee een AI-assistent op een gestructureerde manier externe tools en databronnen kan aanroepen. Vergelijk het met een API-laag tussen de AI en de buitenwereld. De Wettenbank MCP is een zelfgebouwde server in TypeScript die Claude Code drie tools geeft: zoeken, ophalen en wijzigingen monitoren."
+"MCP — Model Context Protocol — is een open standaard van Anthropic waarmee een AI-assistent op een gestructureerde manier externe tools en databronnen kan aanroepen. Vergelijk het met een API-laag tussen de AI en de buitenwereld. De Wettenbank MCP is een zelfgebouwde server in TypeScript die Claude Code drie tools geeft: zoeken op naam, een artikel ophalen, en zoeken welke artikelen een term bevatten."
 
 Achtergrond:
 - MCP is in 2024 gestandaardiseerd door Anthropic en wordt inmiddels ook ondersteund door andere AI-tools (Cursor, Gemini). Het protocol gebruikt JSON-RPC via stdio of HTTP.
 - KOOP staat voor Kennis- en exploitatiecentrum Officiële Overheidspublicaties — de organisatie die wetten.overheid.nl beheert. Ze bieden een SRU 2.0-interface (Search/Retrieve via URL) aan, een bibliotheekstandaard voor zoekopdrachten.
 - SRU (Search/Retrieve via URL) is een internationale bibliotheekstandaard (Z39.50-familie) voor het doorzoeken van metadatacatalogi. De Wettenbank MCP gebruikt dit als basis.
-- wettenbank_wijzigingen is handig voor impact-analyse: als art. 9 IW 1990 wijzigt, kun je automatisch alle annotaties flaggen die mogelijk verouderd zijn.
+- wettenbank_zoekterm ondersteunt wildcards: `termijn*` matcht ook `termijnen` en `termijnoverschrijding`. De output is een lijst van artikelnummers met treffertellingen — directe invoer voor wettenbank_artikel.
 - CC-0 data: alle overheidspublicaties op wetten.overheid.nl vallen onder de open licentie van KOOP — hergebruik zonder beperkingen.
 -->
 
@@ -695,7 +695,7 @@ Wat je zegt:
 Achtergrond:
 - Een contextvenster van een AI-model heeft een maximale capaciteit in tokens (circa 200.000 voor Claude). De volledige Awb in tekst overschrijdt dat ruimschoots. Gerichte opvraging is daarom geen luxe maar noodzaak.
 - De SRU-interface doorzoekt metadata, niet de wetstekst zelf. Dat is een beperking van het zoeksysteem van KOOP. De twee-staps aanpak (eerst BWB-id ophalen via metazoekopdracht, dan wetstekst doorzoeken via regex) omzeilt dit.
-- Dit is ook de reden waarom in CLAUDE.md expliciet staat: gebruik altijd wettenbank_ophalen voor inhoudelijke zoekopdrachten, nooit wettenbank_zoek met alleen een trefwoord.
+- Dit is ook de reden waarom de tools scherp zijn afgebakend: wettenbank_zoek voor metadata/BWB-id, wettenbank_artikel voor één artikel, wettenbank_zoekterm voor het vinden van relevante artikelen.
 -->
 
 ---
@@ -819,13 +819,10 @@ Wat je zegt:
 
 ```
 .claude/skills/
-├── jas/
-│   ├── SKILL.md         # werkwijze: stap 0–10, MCP-strategie, Leidraad-mapping
-│   ├── kaders.md        # JAS v1.0.10 — 13 elementen + taxonomie
-│   └── rapportformat.md # §1–§11 structuur + pre-save checklist
-└── wetzoek/
-    ├── SKILL.md         # werkwijze: stap 0–9, morfologische varianten
-    └── rapportformat.md # §1–§5 structuur + pre-save checklist
+└── jas/
+    ├── SKILL.md         # werkwijze: stap 0–10, MCP-strategie, Leidraad-mapping
+    ├── kaders.md        # JAS v1.0.10 — 13 elementen + taxonomie
+    └── rapportformat.md # §1–§11 structuur + pre-save checklist
 ```
 
 <div class="columns">
@@ -845,7 +842,7 @@ De volledige executie — MCP-aanroepen, wetstekst, annotatie — vindt plaats i
 
 <!--
 Wat je zegt:
-"Elke skill bestaat uit drie gerichte bestanden: SKILL.md voor de werkwijze, kaders.md voor de domeinkennis, rapportformat.md voor de outputstructuur. Die bestanden worden alleen geladen op het moment dat je /jas of /wetzoek aanroept — niet bij elke conversatie. De executie vindt plaats in een geïsoleerde context via `context: fork`. De hoofdconversatie ontvangt daarna alleen het bestandspad van het rapport."
+"De /jas skill bestaat uit drie gerichte bestanden: SKILL.md voor de werkwijze, kaders.md voor de domeinkennis, rapportformat.md voor de outputstructuur. Die bestanden worden alleen geladen op het moment dat je /jas aanroept — niet bij elke conversatie. De executie vindt plaats in een geïsoleerde context via `context: fork`. De hoofdconversatie ontvangt daarna alleen het bestandspad van het rapport."
 
 Achtergrond:
 - `context: fork` is een frontmatter-sleutel in Claude Code skills. Het instrueert de harness om de skill als een subproces te draaien met een eigen contextvenster.
@@ -1021,9 +1018,6 @@ wetten overheid/
     │   ├── SKILL.md          # /jas skill — werkwijze (context:fork)
     │   ├── kaders.md         # JAS v1.0.10 — 13 elementen + taxonomie
     │   └── rapportformat.md  # §1–§11 format + pre-save checklist
-    └── wetzoek/
-        ├── SKILL.md          # /wetzoek skill — werkwijze (context:fork)
-        └── rapportformat.md  # §1–§5 format + pre-save checklist
 ```
 
 <!--
@@ -1033,7 +1027,7 @@ Wat je zegt:
 Achtergrond:
 - src/index.ts is de volledige MCP-server — bewust één bestand gehouden voor onderhoudbaarheid en leesbaarheid.
 - src/index.test.ts bevat unit tests geschreven met Vitest (een moderne, snelle JavaScript-testrunner die compatibel is met de Vite-toolchain).
-- CLAUDE.md is uitgedund van ~66 naar ~30 regels: MCP-strategie en BWB-ids zijn verhuisd naar de skills, die informatie is alleen nodig bij uitvoering van /jas of /wetzoek.
+- CLAUDE.md is uitgedund van ~66 naar ~30 regels: MCP-strategie en BWB-ids zijn verhuisd naar de skill, die informatie is alleen nodig bij uitvoering van /jas.
 - .claude/skills/ bevat de skills — modulaire promptmodules die Claude Code uitvoert in een geïsoleerde context (context:fork). Elk skill-pakket bestaat uit drie lagen: werkwijze (SKILL.md), domeinkennis (kaders.md / rapportformat.md), en kwaliteitseisen.
 - De pre-save checklist in rapportformat.md is een verplichte doorlooplijst vóór opslaan — garandeert dat alle secties zijn ingevuld en kwaliteitseisen zijn gehaald.
 -->
@@ -1045,8 +1039,8 @@ Achtergrond:
 <div class="columns-3">
 <div class="card">
 
-### Meer wetten & monitoring
-De workflow is generiek — elke wet met BWB-id (AWR, Awb, Successiewet, Wet WOZ). Gebruik `wettenbank_wijzigingen` voor automatische impact-analyse bij wetswijzigingen.
+### Meer wetten
+De workflow is generiek — elke wet met BWB-id (AWR, Awb, Successiewet, Wet WOZ). Met `wettenbank_zoekterm` kun je snel verkennen in welke artikelen een begrip voorkomt voordat je annoteert.
 
 </div>
 <div class="card">
@@ -1069,7 +1063,7 @@ Wat je zegt:
 
 Achtergrond:
 - Kennismodel: De Belastingdienst en andere overheidsorganisaties werken aan formele kennismodellen van wetgeving — vaak in RegelSpraak (een Nederlandse regelspecificatietaal) of DMN (Decision Model and Notation). JAS-annotaties bevatten al de bouwstenen: beslisregels in IF-THEN-formaat, parameters met waarden, rekenregels als formules.
-- wettenbank_wijzigingen: Dit MCP-tool geeft een lijst van wetten die zijn gewijzigd sinds een opgegeven datum. Dat maakt het mogelijk om na elke wetswijziging automatisch te checken welke bestaande annotaties mogelijk verouderd zijn.
+- wettenbank_zoekterm: geeft een lijst van artikelen met treffertellingen en directe aanroepaanwijzingen voor wettenbank_artikel. Wildcard `termijn*` matcht ook `termijnen` en `termijnoverschrijding`.
 - Claude Desktop is de desktopapplicatie van Anthropic — ook die ondersteunt MCP-servers. Gemini CLI is Googles command-line interface voor Gemini-modellen, die eveneens het MCP-protocol ondersteunt.
 - Git-versiebeheer van de rapporten maakt diff-analyse mogelijk: bij een wetswijziging zie je exact welke elementen van de annotatie zijn veranderd.
 -->
