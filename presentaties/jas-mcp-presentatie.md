@@ -815,53 +815,40 @@ Wat je zegt:
 
 ## Skills: modulaire opbouw met token-isolatie
 
-<div class="columns">
-<div>
-
-### Oude situatie: commands
-Eén groot promptbestand (400+ regels) geladen in de hoofdcontext. MCP-data, wetstekst en annotatie stapelden op — contextvenster raakte vol.
-
-```
-.claude/skills/
-├── jas.md       # alles in één bestand
-└── wetzoek.md   # alles in één bestand
-```
-
-</div>
-<div>
-
-### Nieuwe situatie: skills
-Drie gerichte bestanden per skill, uitgevoerd in een **geïsoleerde fork-context**. De hoofdconversatie ziet alleen het bestandspad van het rapport.
-
 ```
 .claude/skills/
 ├── jas/
-│   ├── SKILL.md         # werkwijze
-│   ├── kaders.md        # JAS-taxonomie
-│   └── rapportformat.md # §1–§11 + checklist
+│   ├── SKILL.md         # werkwijze: stap 0–10, MCP-strategie, Leidraad-mapping
+│   ├── kaders.md        # JAS v1.0.10 — 13 elementen + taxonomie
+│   └── rapportformat.md # §1–§11 structuur + pre-save checklist
 └── wetzoek/
-    ├── SKILL.md
-    └── rapportformat.md
+    ├── SKILL.md         # werkwijze: stap 0–9, morfologische varianten
+    └── rapportformat.md # §1–§5 structuur + pre-save checklist
 ```
 
+<div class="columns">
+<div class="card">
+
+### Progressive disclosure
+Elk bestand heeft één verantwoordelijkheid. De skill laadt bij aanvang werkwijze + format — domeinkennis staat apart en wordt alleen geladen wanneer nodig.
+
 </div>
+<div class="card-accent">
+
+### `context: fork`
+De volledige executie — MCP-aanroepen, wetstekst, annotatie — vindt plaats in een **geïsoleerde context**. De hoofdconversatie ontvangt alleen het bestandspad van het opgeslagen rapport.
+
 </div>
-
-<div class="highlight">
-
-**`context: fork`** — de volledige skill-executie (MCP-aanroepen, wetstekst, annotatie) vindt plaats in een geïsoleerde context. Zodra de skill klaar is, geeft die alleen het opgeslagen bestandspad terug. De hoofdconversatie blijft schoon.
-
 </div>
 
 <!--
 Wat je zegt:
-"De sleutelverbetering is `context: fork`. Elke keer dat je /jas aanroept, wordt de skill uitgevoerd in een volledig geïsoleerde context. De honderden KB aan wetstekst, MCP-responses en tussenliggende analyses verdwijnen na afloop — de hoofdconversatie ziet alleen het pad naar het opgeslagen rapport. Dat houdt het contextvenster schoon voor langere werksessies."
+"Elke skill bestaat uit drie gerichte bestanden: SKILL.md voor de werkwijze, kaders.md voor de domeinkennis, rapportformat.md voor de outputstructuur. Die bestanden worden alleen geladen op het moment dat je /jas of /wetzoek aanroept — niet bij elke conversatie. De executie vindt plaats in een geïsoleerde context via `context: fork`. De hoofdconversatie ontvangt daarna alleen het bestandspad van het rapport."
 
 Achtergrond:
 - `context: fork` is een frontmatter-sleutel in Claude Code skills. Het instrueert de harness om de skill als een subproces te draaien met een eigen contextvenster.
 - Progressive disclosure: de skill laadt bij aanvang SKILL.md (werkwijze), kaders.md (taxonomie) en rapportformat.md (format). Die bestanden worden dus alleen geladen als de skill daadwerkelijk wordt uitgevoerd — niet bij elke conversatie.
-- Het proof-of-concept (Fase 0 van de migratie) bestond uit een minimale testskill die een bestand las via `$CLAUDE_SKILL_DIR` en schreef naar `analyses/`. Dit verifieerde: (1) dat `context: fork` werkt, (2) dat padverwijzingen kloppen, (3) dat de geforkte agent schrijftoegang heeft naar de juiste map.
-- Token-effect: voor /jas betekent dit dat ~400 regels instructies + alle MCP-data + de annotatie zelf (~7000 woorden) niet meer in de hoofdcontext hoeven. Alleen het eindresultaat (bestandspad) komt terug.
+- Token-effect: voor /jas betekent dit dat alle MCP-data en de annotatie zelf (~7000 woorden) niet in de hoofdcontext terechtkomen. Alleen het eindresultaat (bestandspad) komt terug.
 -->
 
 ---
