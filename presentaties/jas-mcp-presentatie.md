@@ -277,9 +277,9 @@ style: |
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 7px 0;
+    padding: 4px 0;
     border-bottom: 1px solid #dde3ec;
-    font-size: 21px;
+    font-size: 18px;
   }
   section.agenda ol li::before {
     content: counter(agenda-counter);
@@ -720,19 +720,12 @@ Wat je zegt:
 
 ### 13 elementen
 
-<span class="badge" style="background:#4472C4;color:#fff">rechtssubject</span>
-<span class="badge" style="background:#70AD47;color:#fff">rechtsobject</span>
-<span class="badge" style="background:#FF0000;color:#fff">rechtsbetrekking</span>
-<span class="badge" style="background:#FFC000;color:#333">rechtsfeit</span>
-<span class="badge" style="background:#7030A0;color:#fff">voorwaarde</span>
-<span class="badge" style="background:#00B0F0;color:#333">afleidingsregel</span>
-<span class="badge" style="background:#92D050;color:#333">variabele/waarde</span>
-<span class="badge" style="background:#FFD966;color:#333">parameter/waarde</span>
-<span class="badge" style="background:#808080;color:#fff">operator</span>
-<span class="badge" style="background:#F4B942;color:#333">tijdsaanduiding</span>
-<span class="badge" style="background:#9DC3E6;color:#333">plaatsaanduiding</span>
-<span class="badge" style="background:#C9C9C9;color:#333">delegatiebevoegdheid</span>
-<span class="badge" style="background:#D6B4C8;color:#333">brondefinitie</span>
+<div>
+<span class="badge" style="background:#4472C4;color:#fff">rechtssubject</span><span class="badge" style="background:#70AD47;color:#fff">rechtsobject</span><span class="badge" style="background:#FF0000;color:#fff">rechtsbetrekking</span><span class="badge" style="background:#FFC000;color:#333">rechtsfeit</span><span class="badge" style="background:#7030A0;color:#fff">voorwaarde</span><span class="badge" style="background:#00B0F0;color:#333">afleidingsregel</span><span class="badge" style="background:#92D050;color:#333">variabele/waarde</span>
+</div>
+<div>
+<span class="badge" style="background:#FFD966;color:#333">parameter/waarde</span><span class="badge" style="background:#808080;color:#fff">operator</span><span class="badge" style="background:#F4B942;color:#333">tijdsaanduiding</span><span class="badge" style="background:#9DC3E6;color:#333">plaatsaanduiding</span><span class="badge" style="background:#C9C9C9;color:#333">delegatiebevoegdheid</span><span class="badge" style="background:#D6B4C8;color:#333">brondefinitie</span>
+</div>
 
 </div>
 <div>
@@ -868,7 +861,7 @@ Wat je zegt:
 
 ## Voorbeeld: Art. 9 IW 1990 — Betalingstermijnen
 
-Artikel 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. **12 leden, 57 annotaties.**
+Artikel 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. **12 leden, 62 annotaties.**
 
 <div class="columns">
 <div>
@@ -891,13 +884,13 @@ Artikel 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. **12 lede
 
 <div class="card">
 
-- **14 beslisregels**
-- **3 rekenregels** (N = 12 − M; N = 13 − M; N = 12 vast)
-- **8 parameters** (6 weken, 1 maand, 14 dagen, 10 dagen, 15 dagen, 16 maart, 5 jaar, 1 maand tussenpozen)
-- **4 interne** kruisverwijzingen (naar art. 2 IW 1990)
-- **4 externe** wetten geraadpleegd (Wet BPM 1992, Wet ZMR, DWU, Algemene termijnenwet)
+- **6 beslisregels**
+- **5 rekenregels**
+- **8 parameters** (6 weken, 1 maand, 14 dagen, 10 dagen, 15 dagen, 16 maart, 5 jaar, €23/mnd)
+- **10 interne** kruisverwijzingen
+- **4 externe** wetten geraadpleegd (Wet BPM 1992, Wet ZMR, DWU, Algemene douanewet)
 - **4 spanningsvelden** geïdentificeerd
-- **3 lacunes** gedocumenteerd
+- **4 lacunes** gedocumenteerd
 
 </div>
 
@@ -906,7 +899,7 @@ Artikel 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. **12 lede
 
 <!--
 Wat je zegt:
-"Art. 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. Het heeft 12 leden. De workflow produceerde 57 annotaties, 14 beslisregels, 3 rekenregels, en identificeerde 4 spanningsvelden en 3 lacunes. Die lacunes zijn plekken waar de wet iets niet regelt maar dat logischerwijs wel zou moeten."
+"Art. 9 IW 1990 regelt wanneer een belastingaanslag invorderbaar is. Het heeft 12 leden. De workflow produceerde 62 annotaties, 6 beslisregels, 5 rekenregels, en identificeerde 4 spanningsvelden en 4 lacunes. Die lacunes zijn plekken waar de wet iets niet regelt maar dat logischerwijs wel zou moeten."
 
 Achtergrond:
 - Art. 9 IW 1990 in het kort: Een belastingaanslag is invorderbaar zes weken na de dagtekening van het aanslagbiljet (lid 1). Er zijn uitzonderingen: conserverende aanslagen, naheffingsaanslagen, enz. De latere leden regelen specifieke gevallen (motorrijtuigenbelasting, betalingstermijnen in termijnen, enz.).
@@ -950,7 +943,7 @@ Achtergrond:
 
 <div class="highlight">
 
-Rapport Art. 9 IW 1990: **~7 300 woorden**, automatisch gegenereerd, opgeslagen als `analyses/jas-annotatie-art9-IW1990-2026-04-04_21-19-24.md`. Volledig traceerbaar, versiebaar en navolgbaar.
+Rapport Art. 9 IW 1990: **~7 500 woorden**, automatisch gegenereerd, opgeslagen als `analyses/jas-annotatie-art9-IW1990-2026-04-08_09-57-10.md`. Volledig traceerbaar, versiebaar en navolgbaar.
 
 </div>
 
@@ -1012,8 +1005,6 @@ wetten overheid/
 │
 ├── analyses/                 # Gegenereerde rapporten
 │   └── jas-annotatie-art9-IW1990-2026-04-08_09-57-10.md
-│
-├── presentaties/             # Deze presentatie
 │
 ├── CLAUDE.md                 # Rol + betrouwbaarheidsregels (~30 regels)
 └── .claude/skills/
