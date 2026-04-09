@@ -335,12 +335,13 @@ function formatLijst(lijst: Record<string, unknown>, diepte = 0): string[] {
   return lines;
 }
 
-function formatLidNode(lid: Record<string, unknown>, parts: string[]): void {
+function formatLidNode(lid: Record<string, unknown>, parts: string[], artikelnr?: string): void {
   const lidnr = lid.lidnr != null ? getNrValue(lid.lidnr) : "";
-  const prefix = lidnr ? `${lidnr}. ` : "";
+  // Gebruik "9.1" notatie wanneer het artikelnummer bekend is, anders "1."
+  const prefix = lidnr ? (artikelnr ? `${artikelnr}.${lidnr}  ` : `${lidnr}.  `) : "";
   if (lid.al != null) {
     const als = Array.isArray(lid.al) ? lid.al : [lid.al];
-    als.forEach((al, i) => parts.push((i === 0 ? prefix : "") + renderAl(getAlText(al))));
+    als.forEach((al, i) => parts.push((i === 0 ? prefix : "      ") + renderAl(getAlText(al))));
   }
   if (lid.lijst) {
     const lijsten = Array.isArray(lid.lijst) ? lid.lijst : [lid.lijst];
@@ -373,7 +374,7 @@ function formateerArtikelNode(match: ArtikelMatch, lidFilter?: string): string {
         return lidnr === lidFilter;
       });
       if (gevondenLid) {
-        formatLidNode(gevondenLid, parts);
+        formatLidNode(gevondenLid, parts, nr);
       } else {
         parts.push(`(Lid ${lidFilter} niet gevonden in dit artikel)`);
       }
@@ -398,7 +399,7 @@ function formateerArtikelNode(match: ArtikelMatch, lidFilter?: string): string {
   // <lid> elementen (XSD: class.lid — bevat lidnr + structuur.maximaal*)
   if (Array.isArray(node.lid)) {
     for (const lid of node.lid as Record<string, unknown>[]) {
-      formatLidNode(lid, parts);
+      formatLidNode(lid, parts, nr);
     }
   }
 

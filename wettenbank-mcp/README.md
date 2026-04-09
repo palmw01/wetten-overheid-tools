@@ -150,8 +150,8 @@ Hoofdstuk II — Invordering in eerste aanleg
 Afdeling 1 — Betalingstermijnen
 
 Artikel 9 Betalingstermijnen
-1. Een belastingaanslag is invorderbaar zes weken na de dagtekening.
-   a. voor aanslagbelastingen...
+9.1  Een belastingaanslag is invorderbaar zes weken na de dagtekening.
+     a. voor aanslagbelastingen...
 …
 
 Bronreferentie: jci1.3:c:BWBR0004770&artikel=9
