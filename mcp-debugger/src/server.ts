@@ -102,10 +102,15 @@ async function connectMcpServer(serverPath: string): Promise<void> {
   for (const tool of tools) {
     registerTool(tool as Tool, async (args) => {
       const result = await client.callTool({ name: tool.name, arguments: args });
-      // Retourneer de tekst-content direct (MCP-servers sturen markdown als text-blok)
+      // Extraheer tekst-content; parseer als JSON zodat de frontend JSON-viewer activeert
       const textBlock = (result.content as Array<{ type: string; text?: string }>)
         .find((c) => c.type === "text");
-      return textBlock?.text ?? result.content;
+      const raw = textBlock?.text ?? "";
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return raw; // plain text (niet-JSON servers of foutmeldingen)
+      }
     });
   }
 

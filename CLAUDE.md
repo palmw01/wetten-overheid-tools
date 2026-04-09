@@ -24,32 +24,34 @@ Het primaire werkinstrument is `/jas` (artikel-annotatie conform JAS v1.0.10). D
 
 ---
 
-## MCP wettenbank — weergave van resultaten
+## MCP wettenbank — verwerking van resultaten
 
-Toon MCP-resultaten altijd **verbatim** in het Markdown-formaat dat de server produceert (zie `wettenbank-mcp/README.md` §3). Vat ze nooit samen, parafraseer ze niet en herformatteer ze niet — tenzij de gebruiker dat expliciet vraagt.
+De MCP-tools retourneren **pure JSON** (geen Markdown). Parseer de JSON-velden en presenteer de data relevant voor de vraag van de gebruiker.
 
-- **`wettenbank_zoek`** → toon het volledige resultaatblok inclusief `## Resultaten`-header, `Query:`-regel en alle regelingvermeldingen.
-- **`wettenbank_artikel`** → toon de volledige output: header (`[Citeertitel] > Versie geldig op:`), structuurregels (hoofdstuk/afdeling), artikeltekst met lidnummering en `Bronreferentie:`-regel.
-- **`wettenbank_zoekterm`** → toon de volledige output: header, samenvattingsregel met treffer-/artikeltelling, en alle artikel-entries met `→ wettenbank_artikel(...)`-aanroepen.
+- **`wettenbank_zoek`** → JSON met `query`, `totaal`, `dubbeleVerwijderd` en `regelingen` (array). Toon titel, BWB-id en relevante metadata per regeling.
+- **`wettenbank_artikel`** → JSON met `citeertitel`, `versiedatum`, `structuurpad` (array), `tekst`, `bronreferentie` en `waarschuwing`. Toon `tekst` letterlijk; gebruik `structuurpad` voor structuurcontext; vermeld `bronreferentie` als bron.
+- **`wettenbank_zoekterm`** → JSON met `wet`, `versiedatum`, `zoekterm`, `totaalTreffers`, `aantalArtikelen` en `artikelen` (array met `artikel`, `aantalTreffers`, `leden`). Presenteer als overzicht; gebruik de artikelnummers om gericht `wettenbank_artikel` aan te roepen.
+
+Bij een `fout`-veld in de response: meld dit aan de gebruiker met de foutboodschap.
 
 ---
 
 ## MCP wettenbank — tools
 
 Drie tools met elk één verantwoordelijkheid:
-- **`wettenbank_zoek`** — naam → BWB-id + metadata (puur SRU-metadata, geen wetstekst)
-- **`wettenbank_artikel`** — BWB-id + artikelnummer → artikeltekst. Output-format:
+- **`wettenbank_zoek`** — naam/type/ministerie/rechtsgebied → JSON met `regelingen`-array (BWB-id + metadata)
+- **`wettenbank_artikel`** — BWB-id + artikelnummer → JSON:
+  ```json
+  {
+    "citeertitel": "Invorderingswet 1990",
+    "versiedatum": "2024-01-01",
+    "bwbId": "BWBR0004770",
+    "artikel": "25",
+    "structuurpad": ["Hoofdstuk IV — ...", "Afdeling 1 — ..."],
+    "tekst": "Artikel 25 ...",
+    "bronreferentie": "jci1.3:c:BWBR0004770&artikel=25",
+    "waarschuwing": null
+  }
   ```
-  [Citeertitel] > Versie geldig op: YYYY-MM-DD
-
-  Hoofdstuk X — titel          ← één regel per structuurniveau (geen [Structuur: ...]-wrapper)
-  Afdeling Y — titel
-
-  Artikel N Titel
-  N.1  Lid-tekst...
-       a. lijstitem...
-
-  Bronreferentie: jci1.3:c:BWBR...&artikel=N
-  ```
-  Inline verwijzingen (`<extref>`) worden als Markdown-links gerenderd. Vervallen artikelen krijgen een ⚠️-waarschuwing.
-- **`wettenbank_zoekterm`** — BWB-id + zoekterm → gesorteerde lijst van artikelen die de term bevatten, met treffer-aantallen per artikel (DOM-gebaseerd; artikel-grenzen uit XML-structuur). Wildcard: `termijn*`.
+  Bij niet-gevonden: `fout`-veld in plaats van `tekst`/`structuurpad`. Vervallen artikelen hebben een niet-null `waarschuwing`.
+- **`wettenbank_zoekterm`** — BWB-id + zoekterm → JSON met `artikelen`-array (artikel, aantalTreffers, leden). Wildcards: `termijn*`, `*termijn`, `*termijn*`. EN/OF-operatoren: `aansprakelijk EN belasting`.

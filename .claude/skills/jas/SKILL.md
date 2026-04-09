@@ -62,9 +62,15 @@ Roep tegelijk aan:
 - `wettenbank_artikel(bwbId=[B], artikel=[A])` — te annoteren artikel
 - `wettenbank_artikel(bwbId=[B], artikel=[BD])` — begripsbepalingen
 
-Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. De MCP-response-header heeft de vorm `[Citeertitel] > Versie geldig op: [YYYY-MM-DD]`. Noteer de versiedatum als peildatum `[PD]`. Noteer de volledige letterlijke wetstekst van artikel `[A]`. Noteer tevens de `Bronreferentie:`-regel onderaan de MCP-response (JCI-uri, bijv. `jci1.3:c:BWBR0004770&artikel=25`). Gebruik deze uri letterlijk in Bijlage B.
+De tool-resultaten zijn **JSON**. Extraheer per response de volgende velden:
+- `citeertitel` — naam van de wet (bijv. `"Invorderingswet 1990"`)
+- `versiedatum` — geldigheidspeildatum van de opgehaalde versie (YYYY-MM-DD); noteer als `[PD]`
+- `tekst` — de volledige letterlijke wetstekst van het artikel (kopieer woordelijk)
+- `structuurpad` — array van structuurniveaus boven het artikel (bijv. `["Hoofdstuk II — Invordering in eerste aanleg", "Afdeling 1 — Betalingstermijnen"]`)
+- `bronreferentie` — JCI-uri (bijv. `"jci1.3:c:BWBR0004770&artikel=25"`); gebruik letterlijk in Bijlage B
+- `waarschuwing` — `null` of een waarschuwingstekst als het artikel een bijzondere status heeft
 
-**Structuurcontext:** de MCP-response bevat boven de artikelkop één of meer structuurregels, elk op een eigen regel (bijv. `Hoofdstuk II — Invordering in eerste aanleg` / `Afdeling 1 — Betalingstermijnen`). Gebruik deze regels letterlijk voor §1 (structuurpositie in de header) en §2 (Structuurdiagram). **Neem nooit een hoofdstuk- of afdelingstitel aan op basis van de artikelinhoud.** Als er geen structuurregels aanwezig zijn boven de artikelkop (regex-fallback of wet zonder expliciete structuurlabels): noteer dit in §2 als "Structuurpositie niet beschikbaar in MCP-response."
+**Structuurcontext:** gebruik het `structuurpad`-veld (array van strings) letterlijk voor §1 (structuurpositie in de header) en §2 (Structuurdiagram). **Neem nooit een hoofdstuk- of afdelingstitel aan op basis van de artikelinhoud.** Als `structuurpad` een lege array `[]` is: noteer "Structuurpositie niet beschikbaar" in §2.
 
 Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
 
@@ -77,8 +83,8 @@ Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in 
 **Alleen als `[W]` = Invorderingswet 1990 of Uitvoeringsbesluit IW 1990:**
 
 Roep parallel aan:
-- `wettenbank_artikel(bwbId="BWBR0004770", artikel="1")` — tenzij `[A]` = 1 (dan al beschikbaar uit Stap 3). Noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
-- `wettenbank_artikel(bwbId="BWBR0024096", artikel=[A])` — het Leidraad-artikel met hetzelfde nummer als het te annoteren artikel. De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport. Bij 0 resultaat: noteer dit en sla §8 over.
+- `wettenbank_artikel(bwbId="BWBR0004770", artikel="1")` — tenzij `[A]` = 1 (dan al beschikbaar uit Stap 3). Gebruik het `tekst`-veld (JSON) en noteer de letterlijke tekst van art. 1 lid 2 IW 1990 (de Awb-uitsluitingsclausule).
+- `wettenbank_artikel(bwbId="BWBR0024096", artikel=[A])` — het Leidraad-artikel met hetzelfde nummer als het te annoteren artikel. Gebruik het `tekst`-veld (JSON). De Leidraad is een beleidsregel (type: beleidsregel), geen wet, maar verplichte bron voor §8 van het rapport. Als het `fout`-veld aanwezig is (artikel niet gevonden): noteer dit en sla §8 over.
 
 **Nooit:** `BWBR0004800` (Leidraad invordering 1990, verlopen per 2005-07-12).
 
@@ -94,11 +100,11 @@ Maak twee lijsten:
 - **Intern**: verwijzingen naar artikelen binnen dezelfde wet `[W]`
 - **Extern**: verwijzingen naar artikelen in andere wetten
 
-Voor **externe** verwijzingen: gebruik `wettenbank_artikel(bwbId=<id>, artikel=<nr>)` per gerefereerd artikel. Roep alle externe artikelen parallel aan.
+Voor **externe** verwijzingen: gebruik `wettenbank_artikel(bwbId=<id>, artikel=<nr>)` per gerefereerd artikel. Roep alle externe artikelen parallel aan. Gebruik het `tekst`-veld (JSON) van elke response.
 
 BWB-ids: IW 1990 = BWBR0004770 | UB IW = BWBR0004772 | AWR = BWBR0002320 | Awb = BWBR0005537 | Leidraad 2008 = BWBR0024096
 
-Vervallen artikelen worden door de MCP gefilterd — gaten in nummering zijn normaal. De 2KB-preview in het tool-resultaat is niet bruikbaar — gebruik uitsluitend de `artikel`-parameter.
+Vervallen artikelen worden door de MCP gefilterd — gaten in nummering zijn normaal.
 
 ---
 

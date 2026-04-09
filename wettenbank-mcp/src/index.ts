@@ -380,21 +380,25 @@ function formatLidNode(lid: Record<string, unknown>, parts: string[], artikelnr?
   }
 }
 
-function formateerArtikelNode(match: ArtikelMatch, lidFilter?: string): string {
+function formateerArtikelNode(
+  match: ArtikelMatch,
+  lidFilter?: string
+): { tekst: string; structuurpad: string[] } {
   const { node, context } = match;
   const kop = node.kop as Record<string, unknown> | undefined;
   const nr = kop ? getNrValue(kop.nr) : "";
   const titel = kop?.titel != null ? getNrValue(kop.titel) : "";
+
+  // Structuurpad: ancestor-keten als array van strings (los van de artikeltekst)
+  const structuurpad = context.map(c => {
+    const label = c.type.charAt(0).toUpperCase() + c.type.slice(1);
+    const cnr   = c.nr    ? ` ${c.nr}`    : "";
+    const ctitel = c.titel ? ` — ${c.titel}` : "";
+    return `${label}${cnr}${ctitel}`;
+  });
+
+  // Artikeltekst: kop + inhoud, zonder de structuurpad-regels
   const parts: string[] = [];
-  if (context.length > 0) {
-    for (const c of context) {
-      const label = c.type.charAt(0).toUpperCase() + c.type.slice(1);
-      const nr = c.nr ? ` ${c.nr}` : "";
-      const titel = c.titel ? ` — ${c.titel}` : "";
-      parts.push(`${label}${nr}${titel}`);
-    }
-    parts.push("");
-  }
   parts.push(titel ? `Artikel ${nr} ${titel}` : `Artikel ${nr}`);
 
   if (lidFilter) {
@@ -412,7 +416,7 @@ function formateerArtikelNode(match: ArtikelMatch, lidFilter?: string): string {
     } else {
       parts.push(`(Dit artikel heeft geen genummerde leden)`);
     }
-    return parts.join("\n").trim();
+    return { tekst: parts.join("\n").trim(), structuurpad };
   }
 
   // Directe <al> (artikel zonder lid, of preamble-tekst boven lid-lijst)
@@ -441,7 +445,7 @@ function formateerArtikelNode(match: ArtikelMatch, lidFilter?: string): string {
     for (const al of als) parts.push(renderAl(getAlText(al)));
   }
 
-  return parts.join("\n").trim();
+  return { tekst: parts.join("\n").trim(), structuurpad };
 }
 
 /**
@@ -450,7 +454,11 @@ function formateerArtikelNode(match: ArtikelMatch, lidFilter?: string): string {
  * Ondersteunt zowel <artikel> (reguliere wetten) als <circulaire.divisie> (Leidraad).
  * Fallback: extraheerArtikel() op de gesripte tekst.
  */
-export function extraheerArtikelUitXml(rawXml: string, artikelnummer: string, lidFilter?: string): string | null {
+export function extraheerArtikelUitXml(
+  rawXml: string,
+  artikelnummer: string,
+  lidFilter?: string
+): { tekst: string; structuurpad: string[] } | null {
   try {
     const dom = wetParser.parse(rawXml) as Record<string, unknown>;
     const found = zoekArtikelInDom(dom, artikelnummer);
@@ -804,21 +812,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (ministerie) delen.push(`overheid.authority == "${ministerie}"`);
       if (regelingsoort) delen.push(`dcterms.type == "${regelingsoort}"`);
       if (!delen.length)
-        return { content: [{ type: "text", text: "Geef minimaal één zoekcriterium op." }] };
+        return { content: [{ type: "text", text: JSON.stringify({ fout: "Geef minimaal één zoekcriterium op." }) }] };
 
       delen.push(`overheidbwb.geldigheidsdatum==${datum}`);
       const query = delen.join(" and ");
       const xml = await sruRequest(query, Math.min(Number(maxResultaten), 50));
       const ruw = parseRecords(xml);
       const lijst = dedupliceerOpBwbId(ruw);
-      const gedepliceerd = ruw.length !== lijst.length
-        ? ` *(${ruw.length - lijst.length} dubbele versie(s) weggelaten)*`
-        : "";
-
       return {
         content: [{
           type: "text",
-          text: `## Resultaten (${lijst.length})${gedepliceerd}\nQuery: \`${query}\`\n\n${formatRegelingen(lijst)}`,
+          text: JSON.stringify({
+            query,
+            totaal: lijst.length,
+            dubbeleVerwijderd: ruw.length - lijst.length,
+            regelingen: lijst,
+          }),
         }],
       };
     }
@@ -837,27 +846,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (meta.citeertitel) wetNaam = meta.citeertitel;
         if (meta.versiedatum) versiedatum = meta.versiedatum;
       }
-      const header = `${wetNaam} > Versie geldig op: ${versiedatum}`;
-
       // Ophaalstrategie bij N.M-notatie:
       // 1. Probeer het volledige artikelnummer exact (Leidraad: "25.1" is een eigen sub-artikel)
       // 2. Als niet gevonden én er was een punt: probeer artikel N met lid-filter M
-      let artikelTekst: string | null = null;
+      let artikelResultaat: { tekst: string; structuurpad: string[] } | null = null;
       let gebruiktArtikel = artikel;
       let gebruiktLid: string | null = null;
 
       if (rawXml) {
-        artikelTekst = extraheerArtikelUitXml(rawXml, artikel);
-        if (!artikelTekst && lidnr !== null) {
-          artikelTekst = extraheerArtikelUitXml(rawXml, artikelnr, lidnr);
-          if (artikelTekst) {
+        artikelResultaat = extraheerArtikelUitXml(rawXml, artikel);
+        if (!artikelResultaat && lidnr !== null) {
+          artikelResultaat = extraheerArtikelUitXml(rawXml, artikelnr, lidnr);
+          if (artikelResultaat) {
             gebruiktArtikel = artikelnr;
             gebruiktLid = lidnr;
           }
         }
       }
 
-      // Fallback naar tekstgebaseerde extractie (geen lid-filter mogelijk)
+      // Fallback naar tekstgebaseerde extractie (geen lid-filter of structuurpad beschikbaar)
+      let artikelTekst: string | null = artikelResultaat?.tekst ?? null;
+      const structuurpad: string[] = artikelResultaat?.structuurpad ?? [];
       if (!artikelTekst) {
         artikelTekst = extraheerArtikel(inhoud, artikel) ?? (lidnr !== null ? extraheerArtikel(inhoud, artikelnr) : null);
         if (artikelTekst && lidnr !== null) gebruiktArtikel = artikelnr;
@@ -867,15 +876,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       if (artikelTekst) {
         const statusWaarschuwing = detecteerArtikelStatus(rawXml, gebruiktArtikel);
-        if (statusWaarschuwing) {
-          artikelTekst = `⚠️ ${statusWaarschuwing}\n\n${artikelTekst}`;
-        }
         return {
-          content: [{ type: "text", text: `${header}\n\n${artikelTekst}\n\nBronreferentie: ${jci}` }],
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              citeertitel: wetNaam,
+              versiedatum,
+              bwbId,
+              artikel: gebruiktArtikel,
+              structuurpad,
+              tekst: artikelTekst,
+              bronreferentie: jci,
+              waarschuwing: statusWaarschuwing ?? null,
+            }),
+          }],
         };
       }
       return {
-        content: [{ type: "text", text: `${header}\n\nArtikel ${artikel} niet gevonden in deze wet.` }],
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            citeertitel: wetNaam,
+            versiedatum,
+            bwbId,
+            artikel,
+            fout: `Artikel ${artikel} niet gevonden in deze wet.`,
+          }),
+        }],
       };
     }
 
@@ -888,7 +915,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       let versiedatum = regeling.geldigVanaf;
       if (!rawXml) {
         return {
-          content: [{ type: "text", text: `${wetNaam} > Versie geldig op: ${versiedatum}\n\n(Wetstekst niet beschikbaar)` }],
+          content: [{
+            type: "text",
+            text: JSON.stringify({ wet: wetNaam, versiedatum, bwbId, zoekterm, fout: "Wetstekst niet beschikbaar" }),
+          }],
         };
       }
 
@@ -896,39 +926,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const meta = extraheerDocMetadata(dom);
       if (meta.citeertitel) wetNaam = meta.citeertitel;
       if (meta.versiedatum) versiedatum = meta.versiedatum;
-      const header = `${wetNaam} > Versie geldig op: ${versiedatum}`;
 
       const zoekInput = parseZoekterm(zoekterm);
       const treffers = zoekTermInArtikelDom(dom, zoekInput);
       const totaal = treffers.reduce((s, t) => s + t.aantalTreffers, 0);
 
-      if (!treffers.length) {
-        return {
-          content: [{ type: "text", text: `${header}\n\n"${zoekterm}" niet gevonden in deze wet.` }],
-        };
-      }
-
-      const samenvatting = `"${zoekterm}" — ${totaal} treffer(s) in ${treffers.length} artikel(en)`;
-      const regels = treffers
-        .map(t => {
-          const ledenStr = t.leden.length > 0 ? ` — lid ${t.leden.join(", ")}` : "";
-          const aanroepen = [
-            `  → wettenbank_artikel(bwbId="${bwbId}", artikel="${t.artikelnummer}")`,
-            ...t.leden.map(l => `  → wettenbank_artikel(bwbId="${bwbId}", artikel="${t.artikelnummer}.${l}")`),
-          ].join("\n");
-          return `Artikel ${t.artikelnummer} — ${t.aantalTreffers} treffer(s)${ledenStr}\n${aanroepen}`;
-        })
-        .join("\n\n");
-
       return {
-        content: [{ type: "text", text: `${header}\n\n${samenvatting}\n\n${regels}` }],
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            wet: wetNaam,
+            versiedatum,
+            bwbId,
+            zoekterm,
+            totaalTreffers: totaal,
+            aantalArtikelen: treffers.length,
+            artikelen: treffers.map(t => ({
+              artikel: t.artikelnummer,
+              aantalTreffers: t.aantalTreffers,
+              leden: t.leden,
+            })),
+          }),
+        }],
       };
     }
 
-    return { content: [{ type: "text", text: `Onbekende tool: ${name}` }], isError: true };
+    return { content: [{ type: "text", text: JSON.stringify({ fout: `Onbekende tool: ${name}` }) }], isError: true };
   } catch (err) {
     return {
-      content: [{ type: "text", text: `Fout: ${err instanceof Error ? err.message : String(err)}` }],
+      content: [{ type: "text", text: JSON.stringify({ fout: err instanceof Error ? err.message : String(err) }) }],
       isError: true,
     };
   }

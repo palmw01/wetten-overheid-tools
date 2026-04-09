@@ -302,17 +302,17 @@ describe("extraheerArtikelUitXml", () => {
 
   it("extraheert art. 2 correct ook als de body begint met 'Artikel 15, eerste lid'", () => {
     const result = extraheerArtikelUitXml(ubIwXml, "2");
-    expect(result).toContain("Artikel 2");
-    expect(result).toContain("Artikel 15, eerste lid");
-    expect(result).toContain("naheffingsaanslag");
-    expect(result).not.toContain("Artikel 3");
+    expect(result?.tekst).toContain("Artikel 2");
+    expect(result?.tekst).toContain("Artikel 15, eerste lid");
+    expect(result?.tekst).toContain("naheffingsaanslag");
+    expect(result?.tekst).not.toContain("Artikel 3");
   });
 
   it("extraheert art. 1 correct", () => {
     const result = extraheerArtikelUitXml(ubIwXml, "1");
-    expect(result).toContain("Artikel 1");
-    expect(result).toContain("uitvoering aan de artikelen 15 en 28");
-    expect(result).not.toContain("Artikel 2");
+    expect(result?.tekst).toContain("Artikel 1");
+    expect(result?.tekst).toContain("uitvoering aan de artikelen 15 en 28");
+    expect(result?.tekst).not.toContain("Artikel 2");
   });
 
   it("retourneert null voor een niet-bestaand artikelnummer", () => {
@@ -327,8 +327,8 @@ describe("extraheerArtikelUitXml", () => {
       </artikel>
     </wettekst></wetgeving>`;
     const result = extraheerArtikelUitXml(awbXml, "3:40");
-    expect(result).toContain("3:40");
-    expect(result).toContain("bekendgemaakt");
+    expect(result?.tekst).toContain("3:40");
+    expect(result?.tekst).toContain("bekendgemaakt");
   });
 
   it("retourneert null bij lege XML", () => {
@@ -372,31 +372,31 @@ describe("extraheerArtikelUitXml", () => {
 
   it("extraheert Leidraad-artikel via <circulaire.divisie>", () => {
     const result = extraheerArtikelUitXml(leidraadXml, "25");
-    expect(result).toContain("25");
-    expect(result).toContain("Uitstel van betaling");
-    expect(result).toContain("verleent de ontvanger uitstel");
-    expect(result).not.toContain("Kwijtschelding");
-    expect(result).not.toContain("Betalingstermijnen");
+    expect(result?.tekst).toContain("25");
+    expect(result?.tekst).toContain("Uitstel van betaling");
+    expect(result?.tekst).toContain("verleent de ontvanger uitstel");
+    expect(result?.tekst).not.toContain("Kwijtschelding");
+    expect(result?.tekst).not.toContain("Betalingstermijnen");
   });
 
   it("extraheert subartikel van Leidraad via <artikel> binnen <circulaire.divisie>", () => {
     const result = extraheerArtikelUitXml(leidraadXml, "25.1");
-    expect(result).toContain("25.1");
-    expect(result).toContain("Subartikel 25.1");
-    expect(result).not.toContain("Uitstel van betaling");
+    expect(result?.tekst).toContain("25.1");
+    expect(result?.tekst).toContain("Subartikel 25.1");
+    expect(result?.tekst).not.toContain("Uitstel van betaling");
   });
 
   it("extraheert eerste Leidraad-artikel correct (art. 24)", () => {
     const result = extraheerArtikelUitXml(leidraadXml, "24");
-    expect(result).toContain("Betalingstermijnen");
-    expect(result).not.toContain("Uitstel van betaling");
+    expect(result?.tekst).toContain("Betalingstermijnen");
+    expect(result?.tekst).not.toContain("Uitstel van betaling");
   });
 
   it("retourneert null voor niet-bestaand Leidraad-artikel", () => {
     expect(extraheerArtikelUitXml(leidraadXml, "99")).toBeNull();
   });
 
-  it("bevat structuurprefix met officiële hoofdstuktitel", () => {
+  it("structuurpad bevat officiële hoofdstuk- en afdelingstitel", () => {
     const xml = `<?xml version="1.0"?>
 <wetgeving>
   <wet-besluit>
@@ -415,15 +415,13 @@ describe("extraheerArtikelUitXml", () => {
   </wet-besluit>
 </wetgeving>`;
     const result = extraheerArtikelUitXml(xml, "9");
-    expect(result).toContain("Hoofdstuk II");
-    expect(result).toContain("Invordering in eerste aanleg");
-    expect(result).toContain("Betalingstermijnen");
-    expect(result).toContain("Artikel 9");
-    expect(result).toContain("zes weken");
-    expect(result).not.toContain("[Structuur:");
+    expect(result?.structuurpad).toContain("Hoofdstuk II — Invordering in eerste aanleg");
+    expect(result?.structuurpad).toContain("Afdeling 1 — Betalingstermijnen");
+    expect(result?.tekst).toContain("Artikel 9");
+    expect(result?.tekst).toContain("zes weken");
   });
 
-  it("bevat structuurprefix als <titel> een status-attribuut heeft (zoals in de echte IW 1990 XML)", () => {
+  it("structuurpad werkt als <titel> een status-attribuut heeft (zoals in de echte IW 1990 XML)", () => {
     const xml = `<?xml version="1.0"?>
 <wetgeving>
   <wet-besluit>
@@ -443,10 +441,9 @@ describe("extraheerArtikelUitXml", () => {
   </wet-besluit>
 </wetgeving>`;
     const result = extraheerArtikelUitXml(xml, "9");
-    expect(result).toContain("Hoofdstuk II");
-    expect(result).toContain("Invordering in eerste aanleg");
-    expect(result).not.toContain("[object Object]");
-    expect(result).not.toContain("[Structuur:");
+    expect(result?.structuurpad[0]).toContain("Hoofdstuk II");
+    expect(result?.structuurpad[0]).toContain("Invordering in eerste aanleg");
+    expect(result?.structuurpad[0]).not.toContain("[object Object]");
   });
 
   it("toont artikeltitel correct als <titel> een status-attribuut heeft", () => {
@@ -458,14 +455,14 @@ describe("extraheerArtikelUitXml", () => {
   </artikel>
 </wettekst></wet-besluit></wetgeving>`;
     const result = extraheerArtikelUitXml(xml, "9");
-    expect(result).toContain("Betalingstermijnen");
-    expect(result).not.toContain("[object Object]");
+    expect(result?.tekst).toContain("Betalingstermijnen");
+    expect(result?.tekst).not.toContain("[object Object]");
   });
 
-  it("geeft geen structuurprefix als het artikel geen ancestor-kop heeft", () => {
+  it("structuurpad is leeg als het artikel geen ancestor-kop heeft", () => {
     const result = extraheerArtikelUitXml(ubIwXml, "1");
-    expect(result).not.toContain("[Structuur:");
-    expect(result).toContain("Artikel 1");
+    expect(result?.structuurpad).toHaveLength(0);
+    expect(result?.tekst).toContain("Artikel 1");
   });
 
   // ── Lid-filter ──────────────────────────────────────────────────────────────
@@ -482,33 +479,33 @@ describe("extraheerArtikelUitXml", () => {
 
   it("extraheert één lid via lidFilter", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "1");
-    expect(result).toContain("Artikel 9");
-    expect(result).toContain("9.1  Belastingaanslagen worden betaald");
-    expect(result).not.toContain("In afwijking");
-    expect(result).not.toContain("uitstel verlenen");
+    expect(result?.tekst).toContain("Artikel 9");
+    expect(result?.tekst).toContain("9.1  Belastingaanslagen worden betaald");
+    expect(result?.tekst).not.toContain("In afwijking");
+    expect(result?.tekst).not.toContain("uitstel verlenen");
   });
 
   it("extraheert het juiste lid bij meerdere leden", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "2");
-    expect(result).toContain("9.2  In afwijking");
-    expect(result).not.toContain("9.1  Belastingaanslagen");
-    expect(result).not.toContain("uitstel verlenen");
+    expect(result?.tekst).toContain("9.2  In afwijking");
+    expect(result?.tekst).not.toContain("9.1  Belastingaanslagen");
+    expect(result?.tekst).not.toContain("uitstel verlenen");
   });
 
   it("geeft melding als gevraagd lid niet bestaat", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "99");
-    expect(result).toContain("Lid 99 niet gevonden");
+    expect(result?.tekst).toContain("Lid 99 niet gevonden");
   });
 
   it("geeft melding als artikel geen leden heeft maar lid gevraagd wordt", () => {
     const result = extraheerArtikelUitXml(ubIwXml, "1", "1");
-    expect(result).toContain("geen genummerde leden");
+    expect(result?.tekst).toContain("geen genummerde leden");
   });
 
   it("bevat artikeltitel ook bij lid-filter", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "3");
-    expect(result).toContain("Artikel 9 Betalingstermijnen");
-    expect(result).toContain("9.3  De ontvanger kan uitstel");
+    expect(result?.tekst).toContain("Artikel 9 Betalingstermijnen");
+    expect(result?.tekst).toContain("9.3  De ontvanger kan uitstel");
   });
 });
 

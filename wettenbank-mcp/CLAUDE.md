@@ -23,13 +23,17 @@ The entire server lives in `src/index.ts`. It exposes three tools:
 
 | Tool | Purpose |
 |------|---------|
-| `wettenbank_zoek` | Search by title, rechtsgebied, ministerie, or regelingsoort — returns BWB-id + metadata |
-| `wettenbank_artikel` | Fetch one specific article by BWB-id + article number; optional `peildatum` for historical version |
-| `wettenbank_zoekterm` | Find which articles in a regulation contain a term; supports wildcard (`termijn*`); returns article list with hit counts and ready-to-use `wettenbank_artikel` calls |
+| `wettenbank_zoek` | Search by title, rechtsgebied, ministerie, or regelingsoort — returns JSON with `regelingen` array |
+| `wettenbank_artikel` | Fetch one article by BWB-id + article number — returns JSON with `citeertitel`, `versiedatum`, `structuurpad`, `tekst`, `bronreferentie`, `waarschuwing` |
+| `wettenbank_zoekterm` | Find which articles contain a term — returns JSON with `artikelen` array (artikel, aantalTreffers, leden) |
 
-**Data flow (wettenbank_zoek):** builds CQL query → `sruRequest()` hits SRU endpoint → XML parsed → `parseRecords()` + `dedupliceerOpBwbId()` → formatted as markdown.
+**All tools return pure JSON** (no Markdown) serialized as a string in the MCP `text` content block. The LLM parses and formats the data.
 
-**Data flow (wettenbank_artikel / wettenbank_zoekterm):** `haalWetstekstOp()` fetches regulation via SRU, then fetches full XML from `repository.officiele-overheidspublicaties.nl/bwb/`. For `wettenbank_artikel`, `extraheerArtikelUitXml()` extracts the article via DOM-traversal; optional `N.M`-notation (`artikel="9.1"`) activates a lid-filter via `parseerArtikelParam()`. Header uses `extraheerDocMetadata()` for citeertitel + versiedatum; `detecteerArtikelStatus()` adds a ⚠️-warning for vervallen articles; `bouwJciUri()` appends the Bronreferentie. For `wettenbank_zoekterm`, `zoekTermInArtikelDom()` groups matches per article node from the XML DOM (not from plain text).
+**Data flow (wettenbank_zoek):** builds CQL query → `sruRequest()` hits SRU endpoint → XML parsed → `parseRecords()` + `dedupliceerOpBwbId()` → `JSON.stringify({ query, totaal, dubbeleVerwijderd, regelingen })`.
+
+**Data flow (wettenbank_artikel):** `haalWetstekstOp()` fetches regulation via SRU + repository. `extraheerArtikelUitXml()` returns `{ tekst, structuurpad }` via DOM-traversal (`formateerArtikelNode` splits context from article text). `parseerArtikelParam()` handles `N.M`-notation for lid-filter. `extraheerDocMetadata()` provides citeertitel + versiedatum. `detecteerArtikelStatus()` provides the `waarschuwing`. `bouwJciUri()` provides the `bronreferentie`. All assembled as `JSON.stringify({...})`.
+
+**Data flow (wettenbank_zoekterm):** `zoekTermInArtikelDom()` groups matches per article node from XML DOM. `parseZoekterm()` handles EN/OF operators. Returns `JSON.stringify({ wet, versiedatum, bwbId, zoekterm, totaalTreffers, aantalArtikelen, artikelen })`.
 
 ### `wettenbank_zoekterm` — wildcards en operatoren
 

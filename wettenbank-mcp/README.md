@@ -1,6 +1,6 @@
 # Wettenbank MCP — Documentatie
 
-**Versie:** 2.0.1  
+**Versie:** 2.1.0  
 **Taal:** TypeScript (ESM)  
 **Transportprotocol:** StdIO (MCP)  
 **Databron:** wetten.overheid.nl — publieke SRU-interface (CC-0, geen API-sleutel vereist)
@@ -29,9 +29,9 @@ De Wettenbank MCP-server maakt het mogelijk om **vanuit Claude Code rechtstreeks
 
 | Tool                   | Doel                                                                 |
 |------------------------|----------------------------------------------------------------------|
-| `wettenbank_zoek`      | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort; retourneert BWB-id + metadata; optioneel `peildatum` (standaard vandaag) |
-| `wettenbank_artikel`   | Één specifiek artikel ophalen via BWB-id + artikelnummer; optioneel historische versie via `peildatum` |
-| `wettenbank_zoekterm`  | Zoeken welke artikelen een begrip bevatten; ondersteunt wildcard (`termijn*`) |
+| `wettenbank_zoek`      | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort; retourneert **JSON** met `regelingen`-array; optioneel `peildatum` (standaard vandaag) |
+| `wettenbank_artikel`   | Één specifiek artikel ophalen via BWB-id + artikelnummer; retourneert **JSON** met `tekst`, `structuurpad`, `bronreferentie` etc.; optioneel historische versie via `peildatum` |
+| `wettenbank_zoekterm`  | Zoeken welke artikelen een begrip bevatten; retourneert **JSON** met `artikelen`-array; wildcards (`termijn*`, `*termijn`) en EN/OF-operatoren |
 
 ---
 
@@ -59,7 +59,7 @@ Claude Code (LLM)
                                       └─► zoekTermInArtikelDom() → artikellijst met treffertellingen
                                               (DOM-gebaseerd; artikel-grenzen uit XML-structuur)
 
-      ▲  tool result (markdown-tekst over stdout)
+      ▲  tool result (JSON over stdout — LLM parseert en formatteert)
       │
 Claude Code (LLM)
 ```
@@ -100,18 +100,29 @@ Zoekt in het Basiswettenbestand op naam en/of filtert op type, rechtsgebied of m
 | `maxResultaten` | number |           | Maximum aantal resultaten (standaard: 10, maximum: 50)            |
 | `peildatum`     | string |           | Versie geldig op datum `YYYY-MM-DD` (standaard: vandaag)          |
 
-**Resultaatformaat:**
+**Resultaatformaat (JSON):**
 
+```json
+{
+  "query": "overheidbwb.titel any \"invorderings\" and ...",
+  "totaal": 3,
+  "dubbeleVerwijderd": 1,
+  "regelingen": [
+    {
+      "titel": "Invorderingswet 1990",
+      "bwbId": "BWBR0004770",
+      "type": "wet",
+      "ministerie": "Ministerie van Financiën",
+      "rechtsgebied": "Belastingrecht",
+      "geldigVanaf": "1990-06-30",
+      "geldigTot": "onbepaald",
+      "gewijzigd": "2024-01-01",
+      "repositoryUrl": "https://..."
+    }
+  ]
+}
 ```
-## Resultaten (N) *(X dubbele versie(s) weggelaten)*
-Query: `<CQL-query inclusief geldigheidsdatum>`
-
-1. **[Wettitel]**
-   BWB-id: `BWBR…` | Type: wet
-   Ministerie: Financiën | Rechtsgebied: Belastingrecht
-   Geldig: YYYY-MM-DD – YYYY-MM-DD | Gewijzigd: YYYY-MM-DD
-   URL: https://…
-```
+Validatiefout (geen criteria): `{ "fout": "Geef minimaal één zoekcriterium op." }`
 
 ---
 
@@ -142,25 +153,27 @@ Haalt één artikel op uit een regeling via BWB-id en artikelnummer. De response
    → bouwJciUri()              Bronreferentie onderaan de output
 ```
 
-**Resultaatformaat:**
+**Resultaatformaat (JSON):**
 
+```json
+{
+  "citeertitel": "Invorderingswet 1990",
+  "versiedatum": "2024-01-01",
+  "bwbId": "BWBR0004770",
+  "artikel": "9",
+  "structuurpad": [
+    "Hoofdstuk II — Invordering in eerste aanleg",
+    "Afdeling 1 — Betalingstermijnen"
+  ],
+  "tekst": "Artikel 9 Betalingstermijnen\n9.1  Een belastingaanslag is invorderbaar...",
+  "bronreferentie": "jci1.3:c:BWBR0004770&artikel=9",
+  "waarschuwing": null
+}
 ```
-Invorderingswet 1990 > Versie geldig op: YYYY-MM-DD
 
-Hoofdstuk II — Invordering in eerste aanleg
-Afdeling 1 — Betalingstermijnen
+`citeertitel` en `versiedatum` komen uit de `<citeertitel>` en het `inwerkingtreding`-attribuut in de BWB-toestand XML; bij ontbreken wordt de SRU-metadata gebruikt. `structuurpad` is een lege array `[]` als het artikel geen structuurancestors heeft. `waarschuwing` bevat een tekst als het artikel de status `"vervallen"` heeft, anders `null`.
 
-Artikel 9 Betalingstermijnen
-9.1  Een belastingaanslag is invorderbaar zes weken na de dagtekening.
-     a. voor aanslagbelastingen...
-…
-
-Bronreferentie: jci1.3:c:BWBR0004770&artikel=9
-```
-
-De header gebruikt de `<citeertitel>` en het `inwerkingtreding`-attribuut uit de BWB-toestand XML; bij ontbreken wordt de SRU-metadata gebruikt. Als het artikel de status `"vervallen"` heeft, verschijnt een `⚠️`-waarschuwing boven de tekst.
-
-Geeft `Artikel <nr> niet gevonden in deze wet.` als het artikelnummer niet bestaat.
+Niet-gevonden: `{ "citeertitel": "...", "versiedatum": "...", "bwbId": "...", "artikel": "999", "fout": "Artikel 999 niet gevonden in deze wet." }`
 
 ---
 
@@ -173,28 +186,29 @@ Zoekt welke artikelen een begrip bevatten en retourneert een gesorteerde lijst m
 | Parameter   | Type   | Verplicht | Omschrijving                                                                           |
 |-------------|--------|:---------:|----------------------------------------------------------------------------------------|
 | `bwbId`     | string | **ja**    | BWB-id van de regeling, bijv. `BWBR0004770`                                            |
-| `zoekterm`  | string | **ja**    | Te zoeken begrip. Wildcard mogelijk: `"termijn*"` matcht `termijnen`, `termijnoverschrijding` etc. |
+| `zoekterm`  | string | **ja**    | Te zoeken begrip. Zonder wildcard: exacte woordmatch. Wildcards: `termijn*` (begint met), `*termijn` (eindigt op), `*termijn*` (bevat). Operatoren: `aansprakelijk EN belasting`, `uitstel OF afstel`. |
 | `peildatum` | string |           | Historische versie op datum `YYYY-MM-DD` (standaard: vandaag)                          |
 
-**Wildcard:** via `bouwTermPatroon()` — `"termijn*"` → regex `termijn\w*`. Speciale tekens worden eerst geescapet via `escapeerRegex()`.
+**Zoekstrategie:** DOM-gebaseerd via `zoekTermInArtikelDom()` — de term wordt per artikel-node gezocht in de `<al>`-, `<lid>`- en `<lijst>`-tekst. Geneste `<lijst>`-nodes (sub-lijsten) worden recursief doorzocht. Artikel-grenzen komen uit de XML-structuur, niet uit tekstpatronen.
 
-**Zoekstrategie:** DOM-gebaseerd via `zoekTermInArtikelDom()` — de term wordt per artikel-node gezocht in de `<al>`-, `<lid>`- en `<lijst>`-tekst. Geneste `<lijst>`-nodes (sub-lijsten) worden recursief doorzocht via `telInLijst()`. Artikel-grenzen komen uit de XML-structuur, niet uit tekstpatronen. Dit voorkomt false positives vanuit inhoudsopgaven en kruisverwijzingen.
+**Resultaatformaat (JSON):**
 
-**Resultaatformaat:**
-
+```json
+{
+  "wet": "Invorderingswet 1990",
+  "versiedatum": "2024-01-01",
+  "bwbId": "BWBR0004770",
+  "zoekterm": "dwangbevel",
+  "totaalTreffers": 12,
+  "aantalArtikelen": 4,
+  "artikelen": [
+    { "artikel": "13", "aantalTreffers": 5, "leden": ["1", "3"] },
+    { "artikel": "14", "aantalTreffers": 3, "leden": [] }
+  ]
+}
 ```
-Invorderingswet 1990 > Versie geldig op: YYYY-MM-DD
 
-"dwangbevel" — 12 treffer(s) in 4 artikel(en)
-
-Artikel 13 — 5 treffer(s)
-  → wettenbank_artikel(bwbId="BWBR0004770", artikel="13")
-
-Artikel 14 — 3 treffer(s)
-  → wettenbank_artikel(bwbId="BWBR0004770", artikel="14")
-```
-
-Geeft `"<zoekterm>" niet gevonden in deze wet.` als de term nergens voorkomt.
+Niet gevonden: zelfde schema met `totaalTreffers: 0` en `artikelen: []`. Wetstekst niet bereikbaar: `fout`-veld aanwezig.
 
 ---
 
@@ -247,7 +261,7 @@ searchRetrieveResponse
 | `renderAl()`                | ja            | Zet inline `<al>`-markup om naar Markdown: `<extref>` → link, `<nadruk>` → vet/cursief, dan `stripXml` |
 | `getAlText()`               | ja            | Extraheert tekstinhoud van een `<al>`-element; voorkomt `[object Object]` bij `<al>`-nodes met attributen |
 | `parseerArtikelParam()`     | ja            | Splitst `"9.1"` → `{artikelnr:"9", lidnr:"1"}`; Leidraad-subartikelen worden eerst exact opgezocht |
-| `extraheerArtikelUitXml()`  | ja            | DOM-gebaseerde artikel-extractie uit BWB-toestand XML (primair)         |
+| `extraheerArtikelUitXml()`  | ja            | DOM-gebaseerde artikel-extractie; retourneert `{ tekst, structuurpad }` of `null` |
 | `extraheerArtikel()`        | ja            | Regex-gebaseerde artikel-extractie uit platte tekst (fallback)          |
 | `detecteerArtikelStatus()`  | ja            | Controleert `@_status` op de artikel-node; geeft waarschuwing bij `"vervallen"` |
 | `zoekTermInArtikelDom()`    | ja            | DOM-gebaseerde term-zoekfunctie voor `wettenbank_zoekterm`; per artikel-node; zoekt recursief in geneste `<lijst>`-nodes via interne helper `telInLijst()` |
@@ -255,9 +269,10 @@ searchRetrieveResponse
 | `bouwJciUri()`              | ja            | Construeert JCI-uri: `jci1.3:c:<bwbId>&artikel=<nr>`                   |
 | `vindArtikelContext()`      | ja            | Zoekt dichtstbijzijnde artikelkop vóór een matchpositie in platte tekst (niet gebruikt door zoekterm) |
 | `escapeerRegex()`           | ja            | Escapet regex-speciale tekens voor veilig gebruik in `RegExp`           |
-| `bouwTermPatroon()`         | ja            | Bouwt regex-patroon: letterlijk of wildcard (`termijn*` → `termijn\w*`) |
+| `bouwTermPatroon()`         | ja            | Bouwt regex-patroon met woordgrenzen; wildcards `*` voor/na de term     |
+| `parseZoekterm()`           | ja            | Splitst op ` EN `/` OF `; geeft `ZoekInput` met `patronen` + `operator`|
 | `zoekArtikelInDom()`        | nee           | Recursieve DOM-traversal voor artikel-lookup (max. diepte: 30)          |
-| `formateerArtikelNode()`    | nee           | Zet een XML-artikelnode om naar Markdown met lidnummering en structuurprefix |
+| `formateerArtikelNode()`    | nee           | Zet een XML-artikelnode om naar `{ tekst, structuurpad }`               |
 | `vandaag()`                 | nee           | Geeft de huidige datum terug als `YYYY-MM-DD`                           |
 
 ---
@@ -282,15 +297,18 @@ Geeft vier waarden terug (`WetstekstResultaat`):
 
 ---
 
-### 5.3  `bouwTermPatroon(zoekterm)`
+### 5.3  `bouwTermPatroon(zoekterm)` + `parseZoekterm(zoekterm)`
 
-Bouwt een regex-patroon voor `wettenbank_zoekterm`:
+`bouwTermPatroon` bouwt een regex-patroonstring met woordgrenzen:
 
-| Invoer        | Patroon           | Gedrag                                            |
-|---------------|-------------------|---------------------------------------------------|
-| `"termijn"`   | `termijn`         | Letterlijke match                                 |
-| `"termijn*"`  | `termijn\w*`      | Matcht `termijnen`, `termijnoverschrijding`, e.d. |
-| `"art. 9*"`   | `art\. 9\w*`      | Speciale tekens geescapet vóór wildcard           |
+| Invoer        | Patroon            | Gedrag                                                  |
+|---------------|--------------------|---------------------------------------------------------|
+| `"termijn"`   | `\btermijn\b`      | Exacte woordmatch; matcht NIET `termijnen`              |
+| `"termijn*"`  | `\btermijn\w*`     | Matcht `termijn`, `termijnen`, `termijnoverschrijding`  |
+| `"*termijn"`  | `\w*termijn\b`     | Matcht `termijn`, `betalingstermijn`                    |
+| `"*termijn*"` | `\w*termijn\w*`    | Matcht alles wat `termijn` bevat                        |
+
+`parseZoekterm` splitst op ` EN ` of ` OF ` en retourneert `ZoekInput { patronen: RegExp[], operator: "EN"|"OF" }`. Bij EN worden alleen artikelen opgenomen waar alle patronen voorkomen.
 
 ---
 
@@ -302,7 +320,7 @@ Zoekt de dichtstbijzijnde artikelkop **vóór** `matchIndex`. Regex: `/Artikel\s
 
 ### 5.5  `extraheerArtikelUitXml(rawXml, artikelnummer)`
 
-**Primaire** methode voor artikel-extractie. Gebruikt DOM-traversal via `fast-xml-parser`.
+**Primaire** methode voor artikel-extractie. Retourneert `{ tekst: string; structuurpad: string[] } | null`. `tekst` is de letterlijke artikeltekst (kop + leden); `structuurpad` is de ancestor-keten als array van strings (bijv. `["Hoofdstuk II — ...", "Afdeling 1 — ..."]`). Gebruikt DOM-traversal via `fast-xml-parser`.
 
 **Zoekstrategie van `zoekArtikelInDom`:**
 
@@ -371,23 +389,23 @@ gzd
 
 ## 7  Foutafhandeling
 
-Alle tool-handlers zijn omgeven door een `try/catch`. Bij een fout geeft de server:
+Alle tool-handlers zijn omgeven door een `try/catch`. Alle foutresponses zijn **JSON**:
 
 ```json
-{ "content": [{ "type": "text", "text": "Fout: <message>" }], "isError": true }
+{ "content": [{ "type": "text", "text": "{\"fout\": \"<message>\"}" }], "isError": true }
 ```
 
 ### Specifieke foutgevallen
 
-| Situatie                                | Reactie                                                                           |
+| Situatie                                | Reactie (JSON-veld)                                                               |
 |-----------------------------------------|-----------------------------------------------------------------------------------|
-| Onbekend BWB-id (SRU geeft 0 records)   | Fout met vermelding van bekende BWB-ids (IW 1990, AWR, Awb, Leidraad 2008)        |
+| Onbekend BWB-id (SRU geeft 0 records)   | `{ "fout": "Geen regeling voor BWB-id: ... Bekende ids: ..." }`                   |
 | Repository niet bereikbaar (HTTP-fout)  | `inhoud = "(Wetstekst niet bereikbaar: <status>)"` — geen crash                   |
 | Netwerkfout bij repository-fetch        | `inhoud = "(Fout bij ophalen wetstekst)"` — geen crash                            |
-| SRU HTTP-fout                           | `Error("SRU HTTP <status>")` → valt terug op tool-niveau catch                   |
-| Artikel niet gevonden                   | `"Artikel <nr> niet gevonden in deze wet."` in de tekst-output               |
-| Term niet gevonden                      | `"<term>" niet gevonden in deze wet.` in de tekst-output                     |
-| DOM-parse fout of lege XML              | `extraheerArtikelUitXml` geeft `null` → fallback naar `extraheerArtikel`         |
+| SRU HTTP-fout                           | `{ "fout": "SRU HTTP <status>" }` via catch-block                                |
+| Artikel niet gevonden                   | `{ "citeertitel": "...", "artikel": "...", "fout": "Artikel N niet gevonden" }`   |
+| Wetstekst niet beschikbaar (zoekterm)   | `{ "wet": "...", "zoekterm": "...", "fout": "Wetstekst niet beschikbaar" }`       |
+| DOM-parse fout of lege XML              | `extraheerArtikelUitXml` geeft `null` → fallback naar `extraheerArtikel`          |
 | Recursie-diepte > 30                    | `zoekArtikelInDom` stopt en geeft `null` terug (bescherming tegen stack overflow) |
 
 ---
@@ -472,14 +490,15 @@ Alle geëxporteerde functies zijn gedekt door unit tests in `src/index.test.ts`:
 | Testsuite                         | Getest gedrag                                                                       |
 |-----------------------------------|-------------------------------------------------------------------------------------|
 | `escapeerRegex`                   | Regex-speciale tekens escapen; gewone tekst ongewijzigd laten                       |
-| `bouwTermPatroon`                 | Letterlijke term; wildcard `*`-suffix; speciale tekens met wildcard                 |
+| `bouwTermPatroon`                 | Exacte woordgrens; suffix/prefix/infix-wildcard; speciale tekens escapen            |
+| `parseZoekterm`                   | Enkelvoudig; EN-operator (meerdere patronen); OF-operator; wildcard doorgegeven; flags g+i |
 | `stripXml`                        | Tags verwijderen; CDATA uitpakken; entities decoderen; spaties samenvoegen          |
 | `renderAl`                        | `<extref>` → Markdown-link; `<nadruk type="vet">` → `**vet**`; `<intref>` → cursief; onbekende tags weggegooid |
 | `bouwJciUri`                      | Standaard-format; Awb-nummers met dubbele punt; Leidraad-subartikelen               |
 | `extraheerArtikel`                | Artikel op nummer; dubbele punt (Awb); null-fallback; metadata stripping            |
-| `extraheerArtikelUitXml`          | Reguliere wet; Awb (`:` in nr); Leidraad (`circulaire.divisie`); subartikel; structuurprefix; depth-limit; lege XML |
+| `extraheerArtikelUitXml`          | Reguliere wet; Awb (`:` in nr); Leidraad (`circulaire.divisie`); subartikel; `structuurpad`-array; depth-limit; lege XML |
 | `detecteerArtikelStatus`          | Null bij "geldend"; waarschuwing bij "vervallen"; null bij lege XML                 |
-| `zoekTermInArtikelDom`            | Juist artikel; meerdere treffers; lege array; kruisverwijzing telt bij bronartikelen; wildcard; `<lid>`-tekst; geneste `<lijst>`-nodes (sub-lijsten) |
+| `zoekTermInArtikelDom`            | Juist artikel; meerdere treffers; lege array; kruisverwijzing; woordgrens; prefix/suffix-wildcard; EN/OF-operator; `<lid>`-tekst; geneste `<lijst>`-nodes |
 | `extraheerDocMetadata`            | Citeertitel + versiedatum (`inwerkingtreding`-attribuut) uit `<toestand>`-structuur; lege strings als structuur ontbreekt |
 | `parseRecords`                    | Leeg resultaat; enkelvoudig record; meerdere rechtsgebieden; twee records           |
 | `formatRegelingen`                | Lege lijst; BWB-id/titel aanwezig; oplopende nummering; titel-fallback              |
