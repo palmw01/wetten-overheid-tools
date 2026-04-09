@@ -6,447 +6,350 @@
   <title>MCP Debugger</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { mono: ['JetBrains Mono', 'Fira Code', 'monospace'] }
-        }
-      }
-    }
-  </script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    html, body { height: 100%; margin: 0; overflow: hidden; }
-    body {
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
       font-family: 'JetBrains Mono', monospace;
       background: #030712;
       color: #f1f5f9;
-      display: flex;
-      flex-direction: column;
     }
+    body { display: flex; flex-direction: column; }
 
-    /* Markdown rendering */
-    .md-output h1, .md-output h2, .md-output h3 {
-      color: #7dd3fc; font-weight: 600; margin: 0.75em 0 0.4em;
-    }
-    .md-output h1 { font-size: 1.1em; }
-    .md-output h2 { font-size: 1em; }
-    .md-output h3 { font-size: 0.9em; }
-    .md-output p  { margin: 0.4em 0; line-height: 1.6; }
-    .md-output ul, .md-output ol { margin: 0.4em 0; padding-left: 1.4em; }
-    .md-output li { margin: 0.2em 0; }
-    .md-output code {
-      background: #1e293b; color: #86efac;
-      padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.85em;
-    }
-    .md-output pre {
-      background: #0f172a; border: 1px solid #1e293b;
-      border-radius: 6px; padding: 0.75em 1em; overflow-x: auto;
-      margin: 0.5em 0;
-    }
-    .md-output pre code { background: none; padding: 0; }
-    .md-output a { color: #38bdf8; text-decoration: underline; }
-    .md-output strong { color: #e2e8f0; font-weight: 600; }
-    .md-output em { color: #94a3b8; }
-    .md-output hr { border-color: #1e293b; margin: 0.8em 0; }
-    .md-output blockquote {
-      border-left: 3px solid #334155; padding-left: 0.8em;
-      color: #94a3b8; margin: 0.5em 0;
-    }
-    .md-output table { border-collapse: collapse; width: 100%; margin: 0.5em 0; font-size: 0.85em; }
-    .md-output th { background: #1e293b; color: #7dd3fc; padding: 0.4em 0.6em; text-align: left; }
-    .md-output td { border-top: 1px solid #1e293b; padding: 0.3em 0.6em; }
+    /* Markdown */
+    .md h1,.md h2,.md h3 { color:#7dd3fc; font-weight:600; margin:.6em 0 .3em; }
+    .md h1 { font-size:1.05em; }
+    .md h2 { font-size:.95em; }
+    .md h3 { font-size:.9em; }
+    .md p  { margin:.35em 0; line-height:1.6; }
+    .md ul,.md ol { margin:.35em 0; padding-left:1.3em; }
+    .md li { margin:.15em 0; }
+    .md code { background:#1e293b; color:#86efac; padding:.1em .35em; border-radius:3px; font-size:.85em; }
+    .md pre  { background:#0f172a; border:1px solid #1e293b; border-radius:6px; padding:.6em .9em; overflow-x:auto; margin:.4em 0; }
+    .md pre code { background:none; padding:0; }
+    .md a    { color:#38bdf8; text-decoration:underline; }
+    .md strong { color:#e2e8f0; font-weight:600; }
+    .md em   { color:#94a3b8; }
+    .md hr   { border-color:#1e293b; margin:.6em 0; }
+    .md blockquote { border-left:3px solid #334155; padding-left:.7em; color:#94a3b8; margin:.4em 0; }
+    .md table { border-collapse:collapse; width:100%; margin:.4em 0; font-size:.85em; }
+    .md th  { background:#1e293b; color:#7dd3fc; padding:.35em .6em; text-align:left; }
+    .md td  { border-top:1px solid #1e293b; padding:.25em .6em; }
 
-    /* JSON syntax */
-    .json-key  { color: #7dd3fc; }
-    .json-str  { color: #86efac; }
-    .json-num  { color: #fbbf24; }
-    .json-bool { color: #f472b6; }
-    .json-null { color: #94a3b8; }
+    /* JSON */
+    .jk { color:#7dd3fc; }
+    .js { color:#86efac; }
+    .jn { color:#fbbf24; }
+    .jb { color:#f472b6; }
+    .jl { color:#94a3b8; }
 
-    pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+    pre { white-space:pre-wrap; word-break:break-word; margin:0; }
 
-    /* Tab active/inactive */
-    .tab-active   { color: #fff; border-bottom: 2px solid #3b82f6; }
-    .tab-inactive { color: #64748b; border-bottom: 2px solid transparent; }
-    .tab-inactive:hover { color: #94a3b8; }
+    .tab-on  { color:#fff; border-bottom:2px solid #3b82f6; }
+    .tab-off { color:#64748b; border-bottom:2px solid transparent; cursor:pointer; }
+    .tab-off:hover { color:#94a3b8; }
 
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar { width:4px; height:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
   </style>
 </head>
 
 <body>
 
-<!-- ═══════════════════════════════════════════════
-     HEADER
-═══════════════════════════════════════════════ -->
+<!-- HEADER -->
 <header class="flex-none flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
   <div class="flex items-center gap-2">
-    <span class="font-bold text-white tracking-tight">🔧 MCP Debugger</span>
+    <span class="font-bold text-white tracking-tight text-sm">MCP Debugger</span>
     <span class="text-xs text-gray-600">v1.0</span>
   </div>
   <div class="flex items-center gap-2">
     <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-600 inline-block"></span>
-    <span id="status-text" class="text-xs text-gray-400">Verbinden…</span>
+    <span id="status-text" class="text-xs text-gray-400">Verbinden</span>
   </div>
 </header>
 
-<!-- ═══════════════════════════════════════════════
-     TOOLBAR
-═══════════════════════════════════════════════ -->
-<div class="flex-none bg-gray-900 border-b border-gray-800 px-4 py-3 space-y-2">
-
-  <!-- Tool selector + knop -->
+<!-- TOOLBAR -->
+<div class="flex-none bg-gray-900 border-b border-gray-800 px-4 py-2 space-y-2">
   <div class="flex flex-wrap items-center gap-2">
-    <label class="text-xs text-gray-500 uppercase tracking-widest whitespace-nowrap">Tool</label>
+    <label class="text-xs text-gray-500 uppercase tracking-widest">Tool</label>
     <select id="tool-select"
       class="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
-      <option value="">— laden…</option>
+      <option value="">— laden —</option>
     </select>
     <button id="run-btn"
-      class="flex-none px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded transition-colors font-medium whitespace-nowrap">
-      ▶ Uitvoeren
+      class="flex-none px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded font-medium whitespace-nowrap">
+      Uitvoeren
     </button>
   </div>
 
-  <!-- Dynamisch formulier -->
   <div id="form-container" class="hidden">
     <div id="form-fields" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
   </div>
 
-  <!-- Beschrijving -->
   <p id="tool-description" class="hidden text-xs text-gray-500 italic leading-relaxed"></p>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     HOOFD-PANELEN (flex-1, min-h-0 zodat overflow werkt)
-═══════════════════════════════════════════════ -->
-<div class="flex-1 min-h-0 flex flex-col md:flex-row border-b border-gray-800">
+<!-- HOOFD-PANELEN
+     Mobile:  grid met 2 rijen (elk 50% hoogte)
+     Desktop: grid met 2 kolommen naast elkaar
+-->
+<div class="flex-1 min-h-0 grid grid-rows-2 md:grid-rows-1 md:grid-cols-2 border-b border-gray-800">
 
-  <!-- Linker paneel: Request -->
-  <div class="flex flex-col md:w-1/2 border-b md:border-b-0 md:border-r border-gray-800 min-h-0" style="flex: 1; min-height: 120px;">
-    <div class="flex-none px-4 py-2 bg-gray-900 border-b border-gray-800">
-      <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">📤 Request</span>
+  <!-- Request -->
+  <div class="overflow-hidden flex flex-col border-b md:border-b-0 md:border-r border-gray-800">
+    <div class="flex-none px-4 py-1.5 bg-gray-900 border-b border-gray-800">
+      <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Request</span>
     </div>
-    <pre id="request-panel" class="flex-1 overflow-auto p-4 text-xs text-gray-500 bg-gray-950 font-mono">— nog geen aanvraag —</pre>
+    <pre id="request-panel" class="flex-1 overflow-auto p-3 text-xs text-gray-500 bg-gray-950">— nog geen aanvraag —</pre>
   </div>
 
-  <!-- Rechter paneel: Response met tabs -->
-  <div class="flex flex-col md:w-1/2 min-h-0" style="flex: 1; min-height: 120px;">
+  <!-- Response -->
+  <div class="overflow-hidden flex flex-col">
     <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-      <!-- Tabs -->
       <div class="flex gap-4">
-        <button id="tab-btn-formatted"
-          class="tab-active text-xs py-2 transition-colors"
-          onclick="switchTab('formatted')">📄 Opgemaakt</button>
-        <button id="tab-btn-raw"
-          class="tab-inactive text-xs py-2 transition-colors"
-          onclick="switchTab('raw')">{ } JSON</button>
+        <button id="tab-btn-formatted" class="tab-on text-xs py-1.5 transition-colors" onclick="switchTab('formatted')">Opgemaakt</button>
+        <button id="tab-btn-raw"       class="tab-off text-xs py-1.5 transition-colors" onclick="switchTab('raw')">JSON</button>
       </div>
-      <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400 ml-2"></span>
+      <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
     </div>
-
-    <!-- Opgemaakte output -->
-    <div id="response-formatted"
-      class="flex-1 overflow-auto p-4 text-sm bg-gray-950 md-output leading-relaxed">
+    <div id="response-formatted" class="flex-1 overflow-auto p-3 text-sm bg-gray-950 md leading-relaxed">
       <span class="text-gray-600 text-xs">— nog geen response —</span>
     </div>
-
-    <!-- Ruwe JSON output (verborgen) -->
-    <pre id="response-raw"
-      class="hidden flex-1 overflow-auto p-4 text-xs text-gray-300 bg-gray-950 font-mono">— nog geen response —</pre>
+    <pre id="response-raw" class="hidden flex-1 overflow-auto p-3 text-xs text-gray-300 bg-gray-950">— nog geen response —</pre>
   </div>
+
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     SSE STREAM
-═══════════════════════════════════════════════ -->
-<div class="flex-none flex flex-col" style="height: 8rem;">
-  <div class="flex-none px-4 py-1.5 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">📡 SSE Stream</span>
-    <button id="clear-btn" class="text-xs text-gray-700 hover:text-gray-400 transition-colors">leeg maken</button>
+<!-- SSE STREAM -->
+<div class="flex-none flex flex-col border-gray-800" style="height:7rem;">
+  <div class="flex-none px-4 py-1 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Stream</span>
+    <button id="clear-btn" class="text-xs text-gray-700 hover:text-gray-400">leeg</button>
   </div>
-  <div id="sse-log" class="flex-1 overflow-auto p-3 text-xs space-y-0.5 bg-gray-950 font-mono"></div>
+  <div id="sse-log" class="flex-1 overflow-auto px-3 py-1 text-xs space-y-0.5 bg-gray-950"></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     JAVASCRIPT
-═══════════════════════════════════════════════ -->
 <script>
-// ─── Marked config ───────────────────────────────
 marked.setOptions({ breaks: true, gfm: true });
 
-// ─── State ───────────────────────────────────────
-let currentTool = null;
-let tools = [];
-let currentTab = 'formatted';
-let lastRawResult = null;
+let currentTool = null, tools = [], currentTab = 'formatted', lastResult = null;
 
-// ─── Elements ────────────────────────────────────
-const statusDot       = document.getElementById('status-dot');
-const statusText      = document.getElementById('status-text');
-const toolSelect      = document.getElementById('tool-select');
-const runBtn          = document.getElementById('run-btn');
-const formContainer   = document.getElementById('form-container');
-const formFields      = document.getElementById('form-fields');
-const toolDesc        = document.getElementById('tool-description');
-const requestPanel    = document.getElementById('request-panel');
-const respFormatted   = document.getElementById('response-formatted');
-const respRaw         = document.getElementById('response-raw');
-const durationBadge   = document.getElementById('duration-badge');
-const sseLog          = document.getElementById('sse-log');
+const $ = id => document.getElementById(id);
+const statusDot     = $('status-dot');
+const statusText    = $('status-text');
+const toolSelect    = $('tool-select');
+const runBtn        = $('run-btn');
+const formContainer = $('form-container');
+const formFields    = $('form-fields');
+const toolDesc      = $('tool-description');
+const reqPanel      = $('request-panel');
+const respFmt       = $('response-formatted');
+const respRaw       = $('response-raw');
+const durBadge      = $('duration-badge');
+const sseLog        = $('sse-log');
 
-// ─── Tabs ─────────────────────────────────────────
+// Tabs
 function switchTab(tab) {
   currentTab = tab;
-  const isFormatted = tab === 'formatted';
-  document.getElementById('tab-btn-formatted').className =
-    (isFormatted ? 'tab-active' : 'tab-inactive') + ' text-xs py-2 transition-colors';
-  document.getElementById('tab-btn-raw').className =
-    (isFormatted ? 'tab-inactive' : 'tab-active') + ' text-xs py-2 transition-colors';
-  respFormatted.classList.toggle('hidden', !isFormatted);
-  respRaw.classList.toggle('hidden',  isFormatted);
-
-  // Re-render als we al een resultaat hebben
-  if (lastRawResult !== null) renderResponse(lastRawResult);
+  $('tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
+  $('tab-btn-raw').className       = (tab==='raw'?'tab-on':'tab-off')       + ' text-xs py-1.5 transition-colors';
+  respFmt.classList.toggle('hidden', tab !== 'formatted');
+  respRaw.classList.toggle('hidden', tab !== 'raw');
+  if (lastResult !== null) renderResponse(lastResult, false);
 }
 
-// ─── SSE verbinding ──────────────────────────────
+// SSE
 function connectSSE() {
   const es = new EventSource('/api/events');
   es.addEventListener('connected', () => {
     statusDot.className = 'w-2 h-2 rounded-full bg-green-500 inline-block';
     statusText.textContent = 'Verbonden';
-    appendSSELog('system', 'SSE verbonden');
+    log('system', 'SSE verbonden');
   });
-  es.addEventListener('request', e => {
-    const d = JSON.parse(e.data);
-    appendSSELog('request', `${d.tool}  ${JSON.stringify(d.args)}`);
-  });
-  es.addEventListener('response', e => {
-    const d = JSON.parse(e.data);
-    const ok = !d.error;
-    appendSSELog('response', `${d.durationMs}ms  ${ok ? '✓' : '✗ ' + (d.error?.message ?? d.error)}`);
-  });
-  es.addEventListener('ping', () => appendSSELog('ping', '♥'));
+  es.addEventListener('request',  e => { const d=JSON.parse(e.data); log('request',  `${d.tool}  ${JSON.stringify(d.args)}`); });
+  es.addEventListener('response', e => { const d=JSON.parse(e.data); log('response', `${d.durationMs}ms  ${d.error?'fout':'ok'}`); });
+  es.addEventListener('ping',     () => log('ping', '-'));
   es.onerror = () => {
     statusDot.className = 'w-2 h-2 rounded-full bg-red-500 inline-block';
-    statusText.textContent = 'Verbroken — herverbinden…';
-    appendSSELog('system', 'SSE verbroken');
+    statusText.textContent = 'Verbroken';
+    log('system', 'SSE verbroken');
   };
 }
 
-// ─── Tools ophalen ───────────────────────────────
+// Tools
 async function loadTools() {
   try {
-    const res = await fetch('/api/tools');
-    tools = await res.json();
+    const r = await fetch('/api/tools');
+    tools = await r.json();
     toolSelect.innerHTML = '';
-    if (!tools.length) {
-      toolSelect.innerHTML = '<option value="">— geen tools —</option>';
-      return;
-    }
     tools.forEach(t => {
       const o = document.createElement('option');
       o.value = t.name; o.textContent = t.name;
       toolSelect.appendChild(o);
     });
-    selectTool(tools[0].name);
-  } catch (e) {
-    toolSelect.innerHTML = '<option value="">— laden mislukt —</option>';
-    appendSSELog('system', 'Fout bij laden tools: ' + e.message);
+    if (tools.length) selectTool(tools[0].name);
+  } catch(e) {
+    toolSelect.innerHTML = '<option>— laden mislukt —</option>';
   }
 }
 
-// ─── Tool selecteren ─────────────────────────────
 function selectTool(name) {
   currentTool = tools.find(t => t.name === name) ?? null;
   if (!currentTool) return;
   toolDesc.textContent = currentTool.description ?? '';
   toolDesc.classList.toggle('hidden', !currentTool.description);
   buildForm(currentTool.inputSchema);
-  updateRequestPreview();
+  updatePreview();
 }
 toolSelect.addEventListener('change', () => selectTool(toolSelect.value));
 
-// ─── Formulier bouwen ────────────────────────────
+// Formulier
 function buildForm(schema) {
   formFields.innerHTML = '';
   const props = schema?.properties ?? {};
-  const required = new Set(schema?.required ?? []);
+  const req = new Set(schema?.required ?? []);
   const entries = Object.entries(props);
   if (!entries.length) { formContainer.classList.add('hidden'); return; }
   formContainer.classList.remove('hidden');
+
+  const base = 'bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500';
 
   entries.forEach(([key, def]) => {
     const wrap = document.createElement('div');
     wrap.className = 'flex flex-col gap-1';
 
-    const label = document.createElement('label');
-    label.htmlFor = `field-${key}`;
-    label.className = 'text-xs text-gray-400';
-    label.innerHTML = key + (required.has(key) ? ' <span class="text-red-400">*</span>' : '');
+    const lbl = document.createElement('label');
+    lbl.htmlFor = `f-${key}`;
+    lbl.className = 'text-xs text-gray-400';
+    lbl.innerHTML = key + (req.has(key) ? ' <span class="text-red-400">*</span>' : '');
 
-    let input;
     const isDate = key === 'peildatum' || (def.description ?? '').includes('YYYY-MM-DD');
-    const baseClass = 'bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+    let el;
 
     if (def.type === 'boolean') {
-      input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = def.default !== false;
-      input.className = 'w-4 h-4 accent-blue-500 mt-1';
-      input.dataset.type = 'boolean';
+      el = document.createElement('input');
+      el.type = 'checkbox'; el.checked = def.default !== false;
+      el.className = 'w-4 h-4 accent-blue-500 mt-1';
+      el.dataset.type = 'boolean';
     } else if (def.type === 'number' || def.type === 'integer') {
-      input = document.createElement('input');
-      input.type = 'number';
-      input.placeholder = def.description ?? key;
-      if (def.default !== undefined) input.value = def.default;
-      input.className = baseClass;
-      input.dataset.type = def.type;
+      el = document.createElement('input');
+      el.type = 'number'; el.className = base; el.dataset.type = def.type;
+      el.placeholder = def.description ?? key;
+      if (def.default !== undefined) el.value = def.default;
     } else if (def.enum) {
-      input = document.createElement('select');
-      input.className = baseClass;
-      input.dataset.type = 'enum';
+      el = document.createElement('select');
+      el.className = base; el.dataset.type = 'enum';
       def.enum.forEach(v => {
         const o = document.createElement('option');
         o.value = v; o.textContent = v;
         if (v === def.default) o.selected = true;
-        input.appendChild(o);
+        el.appendChild(o);
       });
     } else {
-      input = document.createElement('input');
-      input.type = isDate ? 'date' : 'text';
-      if (!isDate) input.placeholder = def.description ?? key;
-      if (def.default !== undefined) input.value = def.default;
-      input.className = baseClass;
-      input.dataset.type = 'string';
+      el = document.createElement('input');
+      el.type = isDate ? 'date' : 'text'; el.className = base; el.dataset.type = 'string';
+      if (!isDate) el.placeholder = def.description ?? key;
+      if (def.default !== undefined) el.value = def.default;
     }
 
-    input.id = `field-${key}`;
-    input.dataset.key = key;
-    input.addEventListener('input', updateRequestPreview);
-    input.addEventListener('change', updateRequestPreview);
-    wrap.appendChild(label);
-    wrap.appendChild(input);
+    el.id = `f-${key}`; el.dataset.key = key;
+    el.addEventListener('input', updatePreview);
+    el.addEventListener('change', updatePreview);
+    wrap.appendChild(lbl); wrap.appendChild(el);
     formFields.appendChild(wrap);
   });
 }
 
-// ─── Args uitlezen ───────────────────────────────
 function collectArgs() {
   const args = {};
   formFields.querySelectorAll('[data-key]').forEach(el => {
-    const key = el.dataset.key;
-    const type = el.dataset.type;
-    if (type === 'boolean') { args[key] = el.checked; }
-    else if (type === 'number') { if (el.value !== '') args[key] = parseFloat(el.value); }
-    else if (type === 'integer') { if (el.value !== '') args[key] = parseInt(el.value); }
-    else { if (el.value !== '') args[key] = el.value; }
+    const k = el.dataset.key, t = el.dataset.type;
+    if (t === 'boolean')         { args[k] = el.checked; }
+    else if (t === 'number')     { if (el.value !== '') args[k] = parseFloat(el.value); }
+    else if (t === 'integer')    { if (el.value !== '') args[k] = parseInt(el.value); }
+    else                         { if (el.value !== '') args[k] = el.value; }
   });
   return args;
 }
 
-// ─── Request preview ─────────────────────────────
-function updateRequestPreview() {
+function updatePreview() {
   if (!currentTool) return;
-  renderJSON(requestPanel, { tool: currentTool.name, args: collectArgs() });
+  renderJSON(reqPanel, { tool: currentTool.name, args: collectArgs() });
 }
 
-// ─── Response renderen ───────────────────────────
-function renderResponse(result) {
-  lastRawResult = result;
-  const isString = typeof result === 'string';
-
-  // Opgemaakt paneel
-  if (isString) {
-    respFormatted.innerHTML = marked.parse(result);
-  } else {
-    respFormatted.innerHTML = `<pre class="text-xs font-mono">${syntaxHighlight(JSON.stringify(result, null, 2))}</pre>`;
-  }
-
-  // Ruwe JSON
-  respRaw.innerHTML = syntaxHighlight(JSON.stringify(result, null, 2));
+// Response renderen
+function renderResponse(result, store = true) {
+  if (store) lastResult = result;
+  const isStr = typeof result === 'string';
+  respFmt.innerHTML = isStr
+    ? marked.parse(result)
+    : `<pre class="text-xs">${highlight(JSON.stringify(result, null, 2))}</pre>`;
+  respRaw.innerHTML = highlight(JSON.stringify(result, null, 2));
 }
 
-// ─── Uitvoeren ───────────────────────────────────
+// Uitvoeren
 runBtn.addEventListener('click', async () => {
   if (!currentTool) return;
-  runBtn.disabled = true;
-  runBtn.textContent = '⏳ Bezig…';
-  respFormatted.innerHTML = '<span class="text-gray-600 text-xs">— wachten op response… —</span>';
-  respRaw.textContent = '— wachten op response… —';
-  durationBadge.classList.add('hidden');
+  runBtn.disabled = true; runBtn.textContent = 'Bezig...';
+  respFmt.innerHTML = '<span class="text-gray-600 text-xs">wachten...</span>';
+  respRaw.textContent = 'wachten...';
+  durBadge.classList.add('hidden');
 
   const payload = { tool: currentTool.name, args: collectArgs() };
-  const start = Date.now();
-
+  const t0 = Date.now();
   try {
-    const res = await fetch('/api/call', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    const ms = Date.now() - start;
-
+    const r = await fetch('/api/call', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await r.json();
+    const ms = Date.now() - t0;
     if (data.error) {
-      const msg = typeof data.error === 'string' ? data.error : data.error.message;
-      respFormatted.innerHTML = `<div class="text-red-400 text-xs">⚠ ${escapeHtml(msg)}</div>`;
+      const msg = typeof data.error === 'string' ? data.error : (data.error.message ?? JSON.stringify(data.error));
+      respFmt.innerHTML = `<div class="text-red-400 text-xs">Fout: ${esc(msg)}</div>`;
       respRaw.textContent = JSON.stringify(data.error, null, 2);
-      durationBadge.textContent = `${ms}ms`;
-      durationBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-900 text-red-400 ml-2';
+      durBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-900 text-red-400';
     } else {
       renderResponse(data.result);
-      durationBadge.textContent = `${ms}ms`;
-      durationBadge.className = 'text-xs px-2 py-0.5 rounded bg-green-900 text-green-400 ml-2';
+      durBadge.className = 'text-xs px-2 py-0.5 rounded bg-green-900 text-green-400';
     }
-    durationBadge.classList.remove('hidden');
-  } catch (err) {
-    respFormatted.innerHTML = `<div class="text-red-400 text-xs">⚠ ${escapeHtml(err.message)}</div>`;
+    durBadge.textContent = `${ms}ms`;
+    durBadge.classList.remove('hidden');
+  } catch(e) {
+    respFmt.innerHTML = `<div class="text-red-400 text-xs">Fout: ${esc(e.message)}</div>`;
   } finally {
-    runBtn.disabled = false;
-    runBtn.textContent = '▶ Uitvoeren';
+    runBtn.disabled = false; runBtn.textContent = 'Uitvoeren';
   }
 });
 
-// ─── SSE log ─────────────────────────────────────
-function appendSSELog(type, message) {
+// SSE log
+function log(type, msg) {
   const colors = { system:'text-gray-600', request:'text-blue-400', response:'text-green-400', ping:'text-gray-700' };
-  const ts = new Date().toLocaleTimeString('nl-NL', { hour12: false });
+  const ts = new Date().toLocaleTimeString('nl-NL', { hour12:false });
   const line = document.createElement('div');
   line.className = colors[type] ?? 'text-gray-400';
-  line.textContent = `${ts}  [${type.padEnd(8)}]  ${message}`;
+  line.textContent = `${ts}  [${type.padEnd(8)}]  ${msg}`;
   sseLog.appendChild(line);
   sseLog.scrollTop = sseLog.scrollHeight;
 }
-document.getElementById('clear-btn').addEventListener('click', () => { sseLog.innerHTML = ''; });
+$('clear-btn').addEventListener('click', () => sseLog.innerHTML = '');
 
-// ─── JSON renderer ────────────────────────────────
-function renderJSON(el, value) {
-  el.innerHTML = syntaxHighlight(JSON.stringify(value, null, 2));
-}
-function syntaxHighlight(json) {
-  return escapeHtml(json).replace(
-    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+// Helpers
+function renderJSON(el, v) { el.innerHTML = highlight(JSON.stringify(v, null, 2)); }
+function highlight(s) {
+  return esc(s).replace(
+    /("(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
     m => {
-      let c = 'json-num';
-      if (/^"/.test(m)) c = /:$/.test(m) ? 'json-key' : 'json-str';
-      else if (/true|false/.test(m)) c = 'json-bool';
-      else if (/null/.test(m)) c = 'json-null';
+      let c='jn';
+      if (/^"/.test(m)) c = /:$/.test(m) ? 'jk' : 'js';
+      else if (/true|false/.test(m)) c='jb';
+      else if (/null/.test(m)) c='jl';
       return `<span class="${c}">${m}</span>`;
     }
   );
 }
-function escapeHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ─── Init ────────────────────────────────────────
 connectSSE();
 loadTools();
 </script>

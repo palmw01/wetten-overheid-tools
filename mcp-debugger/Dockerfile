@@ -23,6 +23,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV MCP_SERVER_PATH=/app/wettenbank-mcp/dist/index.js
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system app && adduser --system --ingroup app app
 
 COPY --from=debugger-builder /app/dist ./dist
@@ -36,7 +39,7 @@ RUN mkdir -p /app/config /app/logs && chown -R app:app /app
 USER app
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s \
-  CMD node -e "fetch('http://localhost:3000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+  CMD curl -sf http://localhost:3000/health || exit 1
 
 EXPOSE 3000
 CMD ["node", "dist/server.js"]
