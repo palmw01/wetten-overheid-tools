@@ -895,7 +895,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               artikel: gebruiktArtikel,
               structuurpad,
               leden,
-              tekst: artikelTekst,
               bronreferentie: jci,
               waarschuwing: statusWaarschuwing ?? null,
             }),
