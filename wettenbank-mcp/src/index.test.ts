@@ -436,15 +436,15 @@ describe("extraheerArtikelUitXml", () => {
   it("extraheert één lid via lidFilter", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "1");
     expect(result).toContain("Artikel 9");
-    expect(result).toContain("1. Belastingaanslagen worden betaald");
+    expect(result).toContain("9.1  Belastingaanslagen worden betaald");
     expect(result).not.toContain("In afwijking");
     expect(result).not.toContain("uitstel verlenen");
   });
 
   it("extraheert het juiste lid bij meerdere leden", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "2");
-    expect(result).toContain("2. In afwijking");
-    expect(result).not.toContain("1. Belastingaanslagen");
+    expect(result).toContain("9.2  In afwijking");
+    expect(result).not.toContain("9.1  Belastingaanslagen");
     expect(result).not.toContain("uitstel verlenen");
   });
 
@@ -461,7 +461,7 @@ describe("extraheerArtikelUitXml", () => {
   it("bevat artikeltitel ook bij lid-filter", () => {
     const result = extraheerArtikelUitXml(lidXml, "9", "3");
     expect(result).toContain("Artikel 9 Betalingstermijnen");
-    expect(result).toContain("3. De ontvanger kan uitstel");
+    expect(result).toContain("9.3  De ontvanger kan uitstel");
   });
 });
 

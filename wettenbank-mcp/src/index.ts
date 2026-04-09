@@ -677,6 +677,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         "Zoek Nederlandse regelingen in het Basiswettenbestand (wetten.overheid.nl) op naam en retourneer BWB-id + metadata. " +
         "Gebruik 'titel' om wetten op te zoeken (bijv. 'Invorderingswet'). " +
         "Filter optioneel op rechtsgebied (belastingrecht, bestuursrecht), ministerie of regelingsoort. " +
+        "Optioneel: peildatum (YYYY-MM-DD) om te zoeken naar de versie geldig op die datum; default is vandaag. " +
         "Kernwet-ids zijn al bekend: IW 1990 → BWBR0004770 | AWR → BWBR0002320 | Awb → BWBR0005537 | Leidraad 2008 → BWBR0024096.",
       inputSchema: {
         type: "object",
@@ -689,6 +690,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             enum: ["wet", "AMvB", "ministeriele-regeling", "regeling", "besluit"],
           },
           maxResultaten: { type: "number", default: 10 },
+          peildatum: { type: "string", description: "Datum YYYY-MM-DD; retourneert versie geldig op die datum. Default is vandaag." },
         },
       },
     },
@@ -745,8 +747,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
     if (name === "wettenbank_zoek") {
-      const { titel, rechtsgebied, ministerie, regelingsoort, maxResultaten = 10 } =
+      const { titel, rechtsgebied, ministerie, regelingsoort, maxResultaten = 10, peildatum } =
         args as Record<string, string | number>;
+      const datum = typeof peildatum === "string" && peildatum ? peildatum : vandaag();
 
       const delen: string[] = [];
       if (titel) delen.push(`overheidbwb.titel any "${titel}"`);
@@ -756,12 +759,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!delen.length)
         return { content: [{ type: "text", text: "Geef minimaal één zoekcriterium op." }] };
 
+      delen.push(`overheidbwb.geldigheidsdatum==${datum}`);
       const query = delen.join(" and ");
       const xml = await sruRequest(query, Math.min(Number(maxResultaten), 50));
       const ruw = parseRecords(xml);
       const lijst = dedupliceerOpBwbId(ruw);
       const gedepliceerd = ruw.length !== lijst.length
-        ? ` *(${ruw.length - lijst.length} historische versie(s) weggelaten)*`
+        ? ` *(${ruw.length - lijst.length} dubbele versie(s) weggelaten)*`
         : "";
 
       return {

@@ -29,7 +29,7 @@ De Wettenbank MCP-server maakt het mogelijk om **vanuit Claude Code rechtstreeks
 
 | Tool                   | Doel                                                                 |
 |------------------------|----------------------------------------------------------------------|
-| `wettenbank_zoek`      | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort; retourneert BWB-id + metadata |
+| `wettenbank_zoek`      | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort; retourneert BWB-id + metadata; optioneel `peildatum` (standaard vandaag) |
 | `wettenbank_artikel`   | Één specifiek artikel ophalen via BWB-id + artikelnummer; optioneel historische versie via `peildatum` |
 | `wettenbank_zoekterm`  | Zoeken welke artikelen een begrip bevatten; ondersteunt wildcard (`termijn*`) |
 
@@ -87,7 +87,7 @@ Claude Code (LLM)
 
 ### 3.1  `wettenbank_zoek`
 
-Zoekt in het Basiswettenbestand op naam en/of filtert op type, rechtsgebied of ministerie. Retourneert BWB-id + metadata.
+Zoekt in het Basiswettenbestand op naam en/of filtert op type, rechtsgebied of ministerie. Retourneert BWB-id + metadata. De `peildatum` bepaalt welke versie wordt teruggegeven (standaard: vandaag); de CQL-query wordt automatisch uitgebreid met `overheidbwb.geldigheidsdatum==<datum>`.
 
 **Parameters:**
 
@@ -98,12 +98,13 @@ Zoekt in het Basiswettenbestand op naam en/of filtert op type, rechtsgebied of m
 | `ministerie`    | string |           | Bijv. `"Financiën"`, `"Justitie"`                                 |
 | `regelingsoort` | enum   |           | `wet` · `AMvB` · `ministeriele-regeling` · `regeling` · `besluit`|
 | `maxResultaten` | number |           | Maximum aantal resultaten (standaard: 10, maximum: 50)            |
+| `peildatum`     | string |           | Versie geldig op datum `YYYY-MM-DD` (standaard: vandaag)          |
 
 **Resultaatformaat:**
 
 ```
-## Resultaten (N) *(X historische versie(s) weggelaten)*
-Query: `<CQL-query>`
+## Resultaten (N) *(X dubbele versie(s) weggelaten)*
+Query: `<CQL-query inclusief geldigheidsdatum>`
 
 1. **[Wettitel]**
    BWB-id: `BWBR…` | Type: wet
