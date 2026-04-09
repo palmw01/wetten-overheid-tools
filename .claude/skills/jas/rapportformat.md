@@ -39,11 +39,11 @@ Citeer de volledige, letterlijke tekst van artikel `[A]`. Elk lid op een nieuwe 
 
 ## §2 Structuurdiagram
 
-Vermeld eerst de structuurpositie van het artikel, **letterlijk uit de `[Structuur: ...]`-prefix in de MCP-response**:
+Vermeld eerst de structuurpositie van het artikel, **letterlijk overgenomen uit de structuurregels boven de artikelkop in de MCP-response** (elk niveau staat op een eigen regel):
 
-> **Structuurpositie:** [Hoofdstuk X — titel > Afdeling Y — titel > ...]
+> **Structuurpositie:** Hoofdstuk X — titel > Afdeling Y — titel > ...
 
-Als de MCP-response geen `[Structuur: ...]`-prefix bevat: schrijf "Structuurpositie niet beschikbaar in MCP-response." Neem nooit een hoofdstuktitel aan op basis van de artikelinhoud.
+Als de MCP-response geen structuurregels boven de artikelkop bevat: schrijf "Structuurpositie niet beschikbaar in MCP-response." Neem nooit een hoofdstuktitel aan op basis van de artikelinhoud.
 
 Breng daarna de interne relaties tussen de leden in kaart: welk lid is de hoofdregel, welke leden zijn afwijkingen, uitzonderingen of nadere invullingen. Gebruik een boomstructuur met ├── en └── vertakkingen.
 
@@ -244,12 +244,12 @@ Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisrefere
 
 ## Bijlage B — Geraadpleegde bronnen
 
-| Bron | BWB-id | Peildatum (uit MCP) |
-|------|--------|---------------------|
-| [Wetnaam [W]] | [B] | [PD] |
-| [Eventuele externe wet(ten) uit kruisreferenties] | [BWB-id] | [peildatum uit MCP] |
-| Leidraad Invordering 2008 | BWBR0024096 | [peildatum uit MCP] *(alleen bij IW 1990 / UB IW)* |
-| kaders.md | — | [DATUM] |
+| Bron | BWB-id | Peildatum (uit MCP) | JCI-uri (uit MCP) |
+|------|--------|---------------------|-------------------|
+| [Wetnaam [W]] | [B] | [PD] | [jci1.3:c:[B]&artikel=[A]] |
+| [Eventuele externe wet(ten) uit kruisreferenties] | [BWB-id] | [peildatum uit MCP] | [jci1.3:c:...&artikel=X] |
+| Leidraad Invordering 2008 | BWBR0024096 | [peildatum uit MCP] | [jci1.3:c:BWBR0024096&artikel=[A]] *(alleen bij IW 1990 / UB IW)* |
+| kaders.md | — | [DATUM] | — |
 
 ---
 
@@ -275,7 +275,7 @@ Citeer hier de volledige, onbewerkte wetstekst van artikelen die als kruisrefere
 ## Pre-save checklist (doorlopen vóór opslaan)
 
 - [ ] §1: wetstekst letterlijk geciteerd, peildatum uit MCP
-- [ ] §2: structuurpositie (hoofdstuk/afdeling) letterlijk uit `[Structuur: ...]`-prefix MCP-response — nooit aangenomen of afgeleid uit artikelinhoud
+- [ ] §2: structuurpositie letterlijk overgenomen uit de structuurregels boven de artikelkop in MCP-response — nooit aangenomen of afgeleid uit artikelinhoud
 - [ ] §4: alle 13 JAS-elementen beoordeeld per lid (afwezig = expliciet vermeld als "n.v.t.")
 - [ ] §4.[N+1]: delegatieketens volledig (alle schakels opgehaald)
 - [ ] §5: beslisregels, rekenregels én parameters aanwezig (of standaardmelding)

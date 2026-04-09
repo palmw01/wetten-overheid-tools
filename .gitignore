@@ -6,11 +6,8 @@ wettenbank-mcp/dist/
 .claude/settings.local.json
 
 # Gegenereerde wetsanalyse-rapporten — on-demand, niet in versiebeheer
-analyses/*.md
 
 # Gegenereerde HTML-renders
 analyses/*.html
 presentaties/*.html
 
-# Sprekersnotities (lokaal gebruik)
-presentaties/*-sprekersnotities.md

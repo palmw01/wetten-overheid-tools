@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { escapeerRegex, bouwTermPatroon, stripXml, extraheerArtikel, extraheerArtikelUitXml, parseRecords, formatRegelingen, dedupliceerOpBwbId, haalWetstekstOp, sruRequest, vindArtikelContext } from "./index.js";
+import { escapeerRegex, bouwTermPatroon, stripXml, renderAl, bouwJciUri, extraheerArtikel, extraheerArtikelUitXml, detecteerArtikelStatus, zoekTermInArtikelDom, extraheerDocMetadata, parseRecords, formatRegelingen, dedupliceerOpBwbId, haalWetstekstOp, sruRequest, vindArtikelContext, wetParser, getAlText, parseerArtikelParam } from "./index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +100,57 @@ describe("bouwTermPatroon", () => {
   it("escapet speciale tekens zonder wildcard", () => {
     expect(bouwTermPatroon("3:40")).toBe("3:40");
     expect(bouwTermPatroon("25.1")).toBe("25\\.1");
+  });
+});
+
+// ── getAlText ────────────────────────────────────────────────────────────────
+
+describe("getAlText", () => {
+  it("geeft string ongewijzigd terug", () => {
+    expect(getAlText("tekst")).toBe("tekst");
+  });
+
+  it("converteert number naar string", () => {
+    expect(getAlText(42)).toBe("42");
+  });
+
+  it("extraheert #text uit object (al met attribuut)", () => {
+    expect(getAlText({ "#text": "de tekst", "@_status": "officieel" })).toBe("de tekst");
+  });
+
+  it("geeft lege string bij null/undefined", () => {
+    expect(getAlText(null)).toBe("");
+    expect(getAlText(undefined)).toBe("");
+  });
+
+  it("geeft lege string bij object zonder #text", () => {
+    expect(getAlText({ "@_status": "officieel" })).toBe("");
+  });
+});
+
+// ── parseerArtikelParam ───────────────────────────────────────────────────────
+
+describe("parseerArtikelParam", () => {
+  it("geeft enkelvoudig nummer terug zonder lid", () => {
+    expect(parseerArtikelParam("25")).toEqual({ artikelnr: "25", lidnr: null });
+  });
+
+  it("splitst N.M in artikelnr en lidnr", () => {
+    expect(parseerArtikelParam("9.1")).toEqual({ artikelnr: "9", lidnr: "1" });
+    expect(parseerArtikelParam("25.3")).toEqual({ artikelnr: "25", lidnr: "3" });
+  });
+
+  it("behandelt artikelnr met letter (4a.1)", () => {
+    expect(parseerArtikelParam("4a.1")).toEqual({ artikelnr: "4a", lidnr: "1" });
+  });
+
+  it("behandelt Awb-notatie met dubbele punt als geen lid", () => {
+    expect(parseerArtikelParam("3:40")).toEqual({ artikelnr: "3:40", lidnr: null });
+  });
+
+  it("behandelt alfanumeriek gedeelte na punt niet als lid", () => {
+    // "25.a" → maybeLid is "a", niet numeriek → geen lid-splitsing
+    expect(parseerArtikelParam("25.a")).toEqual({ artikelnr: "25.a", lidnr: null });
   });
 });
 
@@ -317,11 +368,12 @@ describe("extraheerArtikelUitXml", () => {
   </wet-besluit>
 </wetgeving>`;
     const result = extraheerArtikelUitXml(xml, "9");
-    expect(result).toContain("[Structuur:");
+    expect(result).toContain("Hoofdstuk II");
     expect(result).toContain("Invordering in eerste aanleg");
     expect(result).toContain("Betalingstermijnen");
     expect(result).toContain("Artikel 9");
     expect(result).toContain("zes weken");
+    expect(result).not.toContain("[Structuur:");
   });
 
   it("bevat structuurprefix als <titel> een status-attribuut heeft (zoals in de echte IW 1990 XML)", () => {
@@ -344,9 +396,10 @@ describe("extraheerArtikelUitXml", () => {
   </wet-besluit>
 </wetgeving>`;
     const result = extraheerArtikelUitXml(xml, "9");
-    expect(result).toContain("[Structuur:");
+    expect(result).toContain("Hoofdstuk II");
     expect(result).toContain("Invordering in eerste aanleg");
     expect(result).not.toContain("[object Object]");
+    expect(result).not.toContain("[Structuur:");
   });
 
   it("toont artikeltitel correct als <titel> een status-attribuut heeft", () => {
@@ -366,6 +419,49 @@ describe("extraheerArtikelUitXml", () => {
     const result = extraheerArtikelUitXml(ubIwXml, "1");
     expect(result).not.toContain("[Structuur:");
     expect(result).toContain("Artikel 1");
+  });
+
+  // ── Lid-filter ──────────────────────────────────────────────────────────────
+
+  const lidXml = `<?xml version="1.0"?>
+<wetgeving><wet-besluit><wettekst>
+  <artikel status="geldend">
+    <kop><label>Artikel</label><nr>9</nr><titel>Betalingstermijnen</titel></kop>
+    <lid><lidnr>1</lidnr><al>Belastingaanslagen worden betaald binnen zes weken.</al></lid>
+    <lid><lidnr>2</lidnr><al>In afwijking van het eerste lid geldt een andere termijn.</al></lid>
+    <lid><lidnr>3</lidnr><al>De ontvanger kan uitstel verlenen.</al></lid>
+  </artikel>
+</wettekst></wet-besluit></wetgeving>`;
+
+  it("extraheert één lid via lidFilter", () => {
+    const result = extraheerArtikelUitXml(lidXml, "9", "1");
+    expect(result).toContain("Artikel 9");
+    expect(result).toContain("1. Belastingaanslagen worden betaald");
+    expect(result).not.toContain("In afwijking");
+    expect(result).not.toContain("uitstel verlenen");
+  });
+
+  it("extraheert het juiste lid bij meerdere leden", () => {
+    const result = extraheerArtikelUitXml(lidXml, "9", "2");
+    expect(result).toContain("2. In afwijking");
+    expect(result).not.toContain("1. Belastingaanslagen");
+    expect(result).not.toContain("uitstel verlenen");
+  });
+
+  it("geeft melding als gevraagd lid niet bestaat", () => {
+    const result = extraheerArtikelUitXml(lidXml, "9", "99");
+    expect(result).toContain("Lid 99 niet gevonden");
+  });
+
+  it("geeft melding als artikel geen leden heeft maar lid gevraagd wordt", () => {
+    const result = extraheerArtikelUitXml(ubIwXml, "1", "1");
+    expect(result).toContain("geen genummerde leden");
+  });
+
+  it("bevat artikeltitel ook bij lid-filter", () => {
+    const result = extraheerArtikelUitXml(lidXml, "9", "3");
+    expect(result).toContain("Artikel 9 Betalingstermijnen");
+    expect(result).toContain("3. De ontvanger kan uitstel");
   });
 });
 
@@ -684,5 +780,224 @@ describe("sruRequest", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve("<xml>ok</xml>") }));
     const result = await sruRequest("test");
     expect(result).toBe("<xml>ok</xml>");
+  });
+});
+
+// ── renderAl ──────────────────────────────────────────────────────────────────
+
+describe("renderAl", () => {
+  it("converteert extref naar Markdown-link", () => {
+    expect(renderAl('<extref doc="BWBR0004770">artikel 9</extref>')).toBe("[artikel 9](BWBR0004770)");
+  });
+
+  it("converteert nadruk type vet naar **bold**", () => {
+    expect(renderAl('<nadruk type="vet">belasting</nadruk>')).toBe("**belasting**");
+  });
+
+  it("converteert nadruk type cur naar _cursief_", () => {
+    expect(renderAl('<nadruk type="cur">termijn</nadruk>')).toBe("_termijn_");
+  });
+
+  it("converteert intref naar *cursief*", () => {
+    expect(renderAl("<intref>artikel 9</intref>")).toBe("*artikel 9*");
+  });
+
+  it("laat gewone tekst ongewijzigd", () => {
+    expect(renderAl("gewone tekst")).toBe("gewone tekst");
+  });
+
+  it("valt terug op stripXml voor onbekende tags", () => {
+    expect(renderAl("<onbekend>tekst</onbekend>")).toBe("tekst");
+  });
+
+  it("verwerkt gemengde content correct", () => {
+    const input = 'De <nadruk type="vet">belastingschuldige</nadruk> betaalt.';
+    expect(renderAl(input)).toBe("De **belastingschuldige** betaalt.");
+  });
+
+  it("verwerkt extref met extra attributen naast doc", () => {
+    expect(renderAl('<extref status="actief" doc="BWBR0005537">artikel 3:40</extref>')).toBe("[artikel 3:40](BWBR0005537)");
+  });
+});
+
+// ── bouwJciUri ────────────────────────────────────────────────────────────────
+
+describe("bouwJciUri", () => {
+  it("genereert correct JCI-uri formaat", () => {
+    expect(bouwJciUri("BWBR0004770", "25")).toBe("jci1.3:c:BWBR0004770&artikel=25");
+  });
+
+  it("werkt ook met Awb-stijl nummers", () => {
+    expect(bouwJciUri("BWBR0005537", "3:40")).toBe("jci1.3:c:BWBR0005537&artikel=3:40");
+  });
+
+  it("werkt met Leidraad subartikel-nummers", () => {
+    expect(bouwJciUri("BWBR0024096", "25.1")).toBe("jci1.3:c:BWBR0024096&artikel=25.1");
+  });
+});
+
+// ── zoekTermInArtikelDom ──────────────────────────────────────────────────────
+
+describe("zoekTermInArtikelDom", () => {
+  const xml = `<wetgeving><wettekst>
+    <artikel><kop><nr>1</nr></kop><al>termijn geldt voor belasting</al></artikel>
+    <artikel><kop><nr>2</nr></kop><al>belasting en termijn en nog een termijn</al></artikel>
+    <artikel><kop><nr>3</nr></kop><al>niets relevants hier</al></artikel>
+  </wettekst></wetgeving>`;
+  const dom = wetParser.parse(xml) as Record<string, unknown>;
+
+  it("vindt de term in de juiste artikelen", () => {
+    const treffers = zoekTermInArtikelDom(dom, /termijn/gi);
+    const nummers = treffers.map(t => t.artikelnummer);
+    expect(nummers).toContain("1");
+    expect(nummers).toContain("2");
+    expect(nummers).not.toContain("3");
+  });
+
+  it("telt meerdere treffers in één artikel correct", () => {
+    const treffers = zoekTermInArtikelDom(dom, /termijn/gi);
+    const art2 = treffers.find(t => t.artikelnummer === "2");
+    expect(art2?.aantalTreffers).toBe(2);
+  });
+
+  it("retourneert lege array als term nergens voorkomt", () => {
+    expect(zoekTermInArtikelDom(dom, /xyzzy/gi)).toHaveLength(0);
+  });
+
+  it("sorteert resultaten numeriek op artikelnummer", () => {
+    const treffers = zoekTermInArtikelDom(dom, /termijn/gi);
+    const nummers = treffers.map(t => t.artikelnummer);
+    expect(nummers[0]).toBe("1");
+    expect(nummers[1]).toBe("2");
+  });
+
+  it("vindt term in <lid>-tekst", () => {
+    const xml2 = `<wetgeving><wettekst>
+      <artikel><kop><nr>5</nr></kop>
+        <lid><lidnr>1</lidnr><al>de termijn bedraagt zes weken</al></lid>
+        <lid><lidnr>2</lidnr><al>andere regel</al></lid>
+      </artikel>
+    </wettekst></wetgeving>`;
+    const dom2 = wetParser.parse(xml2) as Record<string, unknown>;
+    const treffers = zoekTermInArtikelDom(dom2, /termijn/gi);
+    expect(treffers).toHaveLength(1);
+    expect(treffers[0].artikelnummer).toBe("5");
+    expect(treffers[0].aantalTreffers).toBe(1);
+  });
+
+  it("registreert de leden waarin de term voorkomt", () => {
+    const xml2 = `<wetgeving><wettekst>
+      <artikel><kop><nr>9</nr></kop>
+        <lid><lidnr>1</lidnr><al>de termijn bedraagt zes weken</al></lid>
+        <lid><lidnr>2</lidnr><al>andere regel zonder treffer</al></lid>
+        <lid><lidnr>3</lidnr><al>ook deze termijn telt</al></lid>
+      </artikel>
+    </wettekst></wetgeving>`;
+    const dom2 = wetParser.parse(xml2) as Record<string, unknown>;
+    const treffers = zoekTermInArtikelDom(dom2, /termijn/gi);
+    expect(treffers[0].leden).toEqual(["1", "3"]);
+  });
+
+  it("geeft lege leden-array voor artikel zonder <lid>-structuur", () => {
+    const treffers = zoekTermInArtikelDom(dom, /termijn/gi);
+    const art1 = treffers.find(t => t.artikelnummer === "1");
+    expect(art1?.leden).toEqual([]);
+  });
+
+  it("attribueert match aan het juiste artikel, niet aan een kruisverwijzing", () => {
+    // Artikel 5 verwijst naar 'artikel 9' in zijn tekst — telt bij artikel 5, niet 9
+    const xml3 = `<wetgeving><wettekst>
+      <artikel><kop><nr>5</nr></kop><al>zie artikel 9 van deze wet</al></artikel>
+      <artikel><kop><nr>9</nr></kop><al>dit is artikel 9 zelf</al></artikel>
+    </wettekst></wetgeving>`;
+    const dom3 = wetParser.parse(xml3) as Record<string, unknown>;
+    const treffers = zoekTermInArtikelDom(dom3, /artikel 9/gi);
+    const art5 = treffers.find(t => t.artikelnummer === "5");
+    const art9 = treffers.find(t => t.artikelnummer === "9");
+    expect(art5?.aantalTreffers).toBe(1);
+    expect(art9?.aantalTreffers).toBe(1);
+  });
+
+  it("ondersteunt wildcard-patroon via bouwTermPatroon", () => {
+    const treffers = zoekTermInArtikelDom(dom, new RegExp(bouwTermPatroon("termijn*"), "gi"));
+    expect(treffers.length).toBeGreaterThan(0);
+  });
+
+  it("vindt term in realistisch BWB-document met <toestand>-wrapper", () => {
+    // Echte BWB-documenten hebben <toestand> als root-element — niet <wetgeving>
+    const xmlToestand = `<toestand inwerkingtredingsdatum="2026-01-01">
+      <wetgeving><wet-besluit><wettekst>
+        <artikel><kop><nr>9</nr></kop>
+          <lid><lidnr>1</lidnr><al>Een belastingaanslag is invorderbaar zes weken na de dagtekening.</al></lid>
+          <lid><lidnr>5</lidnr><al>In zoveel gelijke termijnen als er maanden overblijven.</al></lid>
+        </artikel>
+        <artikel><kop><nr>10</nr></kop>
+          <al>Geen termijn-gerelateerde tekst hier.</al>
+        </artikel>
+      </wettekst></wet-besluit></wetgeving>
+    </toestand>`;
+    const domToestand = wetParser.parse(xmlToestand) as Record<string, unknown>;
+    const treffers = zoekTermInArtikelDom(domToestand, /termijn/gi);
+    expect(treffers.length).toBeGreaterThan(0);
+    expect(treffers.find(t => t.artikelnummer === "9")).toBeDefined();
+  });
+});
+
+// ── detecteerArtikelStatus ────────────────────────────────────────────────────
+
+describe("detecteerArtikelStatus", () => {
+  it("retourneert null voor een artikel met status geldend", () => {
+    const xml = `<wetgeving><wettekst>
+      <artikel status="geldend"><kop><nr>1</nr></kop><al>tekst</al></artikel>
+    </wettekst></wetgeving>`;
+    expect(detecteerArtikelStatus(xml, "1")).toBeNull();
+  });
+
+  it("retourneert waarschuwing voor een vervallen artikel", () => {
+    const xml = `<wetgeving><wettekst>
+      <artikel status="vervallen"><kop><nr>2</nr></kop><al>tekst</al></artikel>
+    </wettekst></wetgeving>`;
+    const result = detecteerArtikelStatus(xml, "2");
+    expect(result).not.toBeNull();
+    expect(result).toContain("vervallen");
+  });
+
+  it("retourneert null bij lege rawXml", () => {
+    expect(detecteerArtikelStatus("", "1")).toBeNull();
+  });
+
+  it("retourneert null als artikel niet bestaat", () => {
+    const xml = `<wetgeving><wettekst>
+      <artikel status="geldend"><kop><nr>1</nr></kop><al>tekst</al></artikel>
+    </wettekst></wetgeving>`;
+    expect(detecteerArtikelStatus(xml, "99")).toBeNull();
+  });
+});
+
+// ── extraheerDocMetadata ──────────────────────────────────────────────────────
+
+describe("extraheerDocMetadata", () => {
+  it("extraheert citeertitel en versiedatum uit toestand-structuur", () => {
+    const xml = `<toestand inwerkingtredingsdatum="2024-01-01">
+      <wetgeving>
+        <wet-besluit>
+          <regeling-info>
+            <citeertitel>Invorderingswet 1990</citeertitel>
+          </regeling-info>
+          <wettekst></wettekst>
+        </wet-besluit>
+      </wetgeving>
+    </toestand>`;
+    const dom = wetParser.parse(xml) as Record<string, unknown>;
+    const meta = extraheerDocMetadata(dom);
+    expect(meta.citeertitel).toBe("Invorderingswet 1990");
+    expect(meta.versiedatum).toBe("2024-01-01");
+  });
+
+  it("geeft lege strings als de toestand-structuur ontbreekt", () => {
+    const dom = wetParser.parse("<wetgeving><wettekst></wettekst></wetgeving>") as Record<string, unknown>;
+    const meta = extraheerDocMetadata(dom);
+    expect(meta.citeertitel).toBe("");
+    expect(meta.versiedatum).toBe("");
   });
 });

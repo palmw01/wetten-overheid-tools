@@ -62,9 +62,9 @@ Roep tegelijk aan:
 - `wettenbank_artikel(bwbId=[B], artikel=[A])` — te annoteren artikel
 - `wettenbank_artikel(bwbId=[B], artikel=[BD])` — begripsbepalingen
 
-Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. Noteer de peildatum `[PD]` en geldigheidsdatum uit de metadata. Noteer de volledige letterlijke wetstekst van artikel `[A]`.
+Uit beide tool-resultaten staat de tekst direct beschikbaar — geen Bash nodig. De MCP-response-header heeft de vorm `[Citeertitel] > Versie geldig op: [YYYY-MM-DD]`. Noteer de versiedatum als peildatum `[PD]`. Noteer de volledige letterlijke wetstekst van artikel `[A]`. Noteer tevens de `Bronreferentie:`-regel onderaan de MCP-response (JCI-uri, bijv. `jci1.3:c:BWBR0004770&artikel=25`). Gebruik deze uri letterlijk in Bijlage B.
 
-**Structuurcontext:** de MCP-response bevat boven de artikeltekst een prefix in de vorm `[Structuur: Hoofdstuk X — titel > Afdeling Y — titel]`. Gebruik deze prefix letterlijk voor §1 (structuurpositie in de header) en §2 (Structuurdiagram). **Neem nooit een hoofdstuk- of afdelingstitel aan op basis van de artikelinhoud.** Als de prefix ontbreekt (regex-fallback of wet zonder expliciete structuurlabels): noteer dit expliciet in §2 als "Structuurpositie niet beschikbaar in MCP-response."
+**Structuurcontext:** de MCP-response bevat boven de artikelkop één of meer structuurregels, elk op een eigen regel (bijv. `Hoofdstuk II — Invordering in eerste aanleg` / `Afdeling 1 — Betalingstermijnen`). Gebruik deze regels letterlijk voor §1 (structuurpositie in de header) en §2 (Structuurdiagram). **Neem nooit een hoofdstuk- of afdelingstitel aan op basis van de artikelinhoud.** Als er geen structuurregels aanwezig zijn boven de artikelkop (regex-fallback of wet zonder expliciete structuurlabels): noteer dit in §2 als "Structuurpositie niet beschikbaar in MCP-response."
 
 Noteer uit `[BD]` alle begripsomschrijvingen die betrekking hebben op termen in artikel `[A]`.
 

@@ -29,7 +29,7 @@ The entire server lives in `src/index.ts`. It exposes three tools:
 
 **Data flow (wettenbank_zoek):** builds CQL query → `sruRequest()` hits SRU endpoint → XML parsed → `parseRecords()` + `dedupliceerOpBwbId()` → formatted as markdown.
 
-**Data flow (wettenbank_artikel / wettenbank_zoekterm):** `haalWetstekstOp()` fetches regulation via SRU, then fetches full XML from `repository.officiele-overheidspublicaties.nl/bwb/` and strips to plain text via `stripXml()`. For `wettenbank_artikel`, `extraheerArtikelUitXml()` extracts the single article XML node before stripping. For `wettenbank_zoekterm`, `vindArtikelContext()` groups matches by nearest article header.
+**Data flow (wettenbank_artikel / wettenbank_zoekterm):** `haalWetstekstOp()` fetches regulation via SRU, then fetches full XML from `repository.officiele-overheidspublicaties.nl/bwb/`. For `wettenbank_artikel`, `extraheerArtikelUitXml()` extracts the article via DOM-traversal; optional `N.M`-notation (`artikel="9.1"`) activates a lid-filter via `parseerArtikelParam()`. Header uses `extraheerDocMetadata()` for citeertitel + versiedatum; `detecteerArtikelStatus()` adds a ⚠️-warning for vervallen articles; `bouwJciUri()` appends the Bronreferentie. For `wettenbank_zoekterm`, `zoekTermInArtikelDom()` groups matches per article node from the XML DOM (not from plain text).
 
 ### `wettenbank_zoekterm` — wildcard
 

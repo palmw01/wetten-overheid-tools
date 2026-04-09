@@ -28,5 +28,18 @@ Het primaire werkinstrument is `/jas` (artikel-annotatie conform JAS v1.0.10). D
 
 Drie tools met elk één verantwoordelijkheid:
 - **`wettenbank_zoek`** — naam → BWB-id + metadata (puur SRU-metadata, geen wetstekst)
-- **`wettenbank_artikel`** — BWB-id + artikelnummer → artikeltekst (gebruik dit voor JAS)
-- **`wettenbank_zoekterm`** — BWB-id + zoekterm → lijst van artikelen die de term bevatten (wildcard: `termijn*`)
+- **`wettenbank_artikel`** — BWB-id + artikelnummer → artikeltekst. Output-format:
+  ```
+  [Citeertitel] > Versie geldig op: YYYY-MM-DD
+
+  Hoofdstuk X — titel          ← één regel per structuurniveau (geen [Structuur: ...]-wrapper)
+  Afdeling Y — titel
+
+  Artikel N Titel
+  1. Lid-tekst...
+     a. lijstitem...
+
+  Bronreferentie: jci1.3:c:BWBR...&artikel=N
+  ```
+  Inline verwijzingen (`<extref>`) worden als Markdown-links gerenderd. Vervallen artikelen krijgen een ⚠️-waarschuwing.
+- **`wettenbank_zoekterm`** — BWB-id + zoekterm → gesorteerde lijst van artikelen die de term bevatten, met treffer-aantallen per artikel (DOM-gebaseerd; artikel-grenzen uit XML-structuur). Wildcard: `termijn*`.
