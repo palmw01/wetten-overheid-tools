@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="nl" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCP Debugger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { mono: ['JetBrains Mono', 'Fira Code', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'JetBrains Mono', monospace; }
+    .json-key   { color: #7dd3fc; }
+    .json-str   { color: #86efac; }
+    .json-num   { color: #fbbf24; }
+    .json-bool  { color: #f472b6; }
+    .json-null  { color: #94a3b8; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+
+<body class="dark h-full bg-gray-950 text-gray-100">
+
+<!-- =========================================================
+     HEADER
+========================================================= -->
+<header class="border-b border-gray-800 px-6 py-3 flex items-center justify-between bg-gray-900">
+  <div class="flex items-center gap-3">
+    <span class="text-lg font-bold tracking-tight text-white">🔧 MCP Debugger</span>
+    <span class="text-xs text-gray-500">v1.0</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-gray-600"></span>
+    <span id="status-text" class="text-xs text-gray-400">Verbinden…</span>
+  </div>
+</header>
+
+<!-- =========================================================
+     TOOL SELECTOR + FORMULIER
+========================================================= -->
+<div class="border-b border-gray-800 px-6 py-4 bg-gray-900">
+
+  <!-- Tool dropdown -->
+  <div class="flex items-center gap-4 mb-4">
+    <label class="text-xs text-gray-400 uppercase tracking-widest whitespace-nowrap">Tool</label>
+    <select id="tool-select"
+      class="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+      <option value="">— laden…</option>
+    </select>
+    <button id="run-btn"
+      class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors font-medium">
+      ▶ Uitvoeren
+    </button>
+  </div>
+
+  <!-- Dynamisch formulier -->
+  <div id="form-container" class="hidden">
+    <div class="text-xs text-gray-500 uppercase tracking-widest mb-2">Parameters</div>
+    <div id="form-fields" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </div>
+
+  <!-- Tool-beschrijving -->
+  <p id="tool-description" class="mt-2 text-xs text-gray-500 italic hidden"></p>
+</div>
+
+<!-- =========================================================
+     HOOFD-PANELEN: REQUEST | RESPONSE
+========================================================= -->
+<div class="grid grid-cols-2 border-b border-gray-800" style="height: 36vh; min-height: 200px;">
+
+  <!-- Linker paneel: Request -->
+  <div class="flex flex-col border-r border-gray-800">
+    <div class="px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center gap-2">
+      <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">📤 Request</span>
+    </div>
+    <pre id="request-panel"
+      class="flex-1 overflow-auto p-4 text-xs bg-gray-950 text-gray-500 font-mono">
+— nog geen aanvraag —</pre>
+  </div>
+
+  <!-- Rechter paneel: Response -->
+  <div class="flex flex-col">
+    <div class="px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+      <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">📥 Response</span>
+      <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
+    </div>
+    <pre id="response-panel"
+      class="flex-1 overflow-auto p-4 text-xs bg-gray-950 text-gray-500 font-mono">
+— nog geen response —</pre>
+  </div>
+
+</div>
+
+<!-- =========================================================
+     SSE STREAM
+========================================================= -->
+<div class="flex flex-col" style="height: 24vh; min-height: 120px;">
+  <div class="px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">📡 SSE Stream</span>
+    <button id="clear-btn" class="text-xs text-gray-600 hover:text-gray-400 transition-colors">leeg maken</button>
+  </div>
+  <div id="sse-log"
+    class="flex-1 overflow-auto p-4 font-mono text-xs space-y-0.5 bg-gray-950"></div>
+</div>
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================= -->
+<script>
+// ─── State ───────────────────────────────────────────────
+let currentTool = null;    // { name, description, inputSchema }
+let tools = [];
+
+// ─── Elements ────────────────────────────────────────────
+const statusDot    = document.getElementById('status-dot');
+const statusText   = document.getElementById('status-text');
+const toolSelect   = document.getElementById('tool-select');
+const runBtn       = document.getElementById('run-btn');
+const formContainer= document.getElementById('form-container');
+const formFields   = document.getElementById('form-fields');
+const toolDesc     = document.getElementById('tool-description');
+const requestPanel = document.getElementById('request-panel');
+const responsePanel= document.getElementById('response-panel');
+const durationBadge= document.getElementById('duration-badge');
+const sseLog       = document.getElementById('sse-log');
+const clearBtn     = document.getElementById('clear-btn');
+
+// ─── SSE verbinding ──────────────────────────────────────
+function connectSSE() {
+  const es = new EventSource('/api/events');
+
+  es.addEventListener('connected', () => {
+    statusDot.className = 'inline-block w-2.5 h-2.5 rounded-full bg-green-500';
+    statusText.textContent = 'Verbonden';
+    appendSSELog('system', 'SSE verbonden');
+  });
+
+  es.addEventListener('request', (e) => {
+    const d = JSON.parse(e.data);
+    appendSSELog('request', `${d.tool}  ${JSON.stringify(d.args)}`);
+  });
+
+  es.addEventListener('response', (e) => {
+    const d = JSON.parse(e.data);
+    const ok = !d.error;
+    appendSSELog('response', `${d.durationMs}ms  ${ok ? '✓' : '✗ ' + (d.error?.message ?? d.error)}`);
+    if (ok) {
+      renderJSON(responsePanel, d.result);
+      durationBadge.textContent = `${d.durationMs}ms`;
+      durationBadge.className = 'text-xs px-2 py-0.5 rounded bg-green-900 text-green-400';
+      durationBadge.classList.remove('hidden');
+    } else {
+      renderError(responsePanel, d.error);
+      durationBadge.textContent = `${d.durationMs}ms`;
+      durationBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-900 text-red-400';
+      durationBadge.classList.remove('hidden');
+    }
+  });
+
+  es.addEventListener('ping', () => {
+    appendSSELog('ping', '♥');
+  });
+
+  es.onerror = () => {
+    statusDot.className = 'inline-block w-2.5 h-2.5 rounded-full bg-red-500';
+    statusText.textContent = 'Verbroken — herverbinden…';
+    appendSSELog('system', 'SSE verbroken');
+  };
+}
+
+// ─── Tools ophalen ──────────────────────────────────────
+async function loadTools() {
+  try {
+    const res = await fetch('/api/tools');
+    tools = await res.json();
+    toolSelect.innerHTML = '';
+
+    if (tools.length === 0) {
+      toolSelect.innerHTML = '<option value="">— geen tools beschikbaar —</option>';
+      return;
+    }
+
+    tools.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      toolSelect.appendChild(opt);
+    });
+
+    selectTool(tools[0].name);
+  } catch (err) {
+    toolSelect.innerHTML = '<option value="">— laden mislukt —</option>';
+    appendSSELog('system', 'Fout bij laden tools: ' + err.message);
+  }
+}
+
+// ─── Tool selecteren ─────────────────────────────────────
+function selectTool(name) {
+  currentTool = tools.find(t => t.name === name) ?? null;
+  if (!currentTool) return;
+
+  // Beschrijving
+  if (currentTool.description) {
+    toolDesc.textContent = currentTool.description;
+    toolDesc.classList.remove('hidden');
+  } else {
+    toolDesc.classList.add('hidden');
+  }
+
+  // Formulier genereren
+  buildForm(currentTool.inputSchema);
+
+  // Request-paneel bijwerken
+  updateRequestPreview();
+}
+
+toolSelect.addEventListener('change', () => selectTool(toolSelect.value));
+
+// ─── Formulier bouwen ────────────────────────────────────
+function buildForm(schema) {
+  formFields.innerHTML = '';
+
+  const props = schema?.properties ?? {};
+  const required = new Set(schema?.required ?? []);
+  const entries = Object.entries(props);
+
+  if (entries.length === 0) {
+    formContainer.classList.add('hidden');
+    return;
+  }
+
+  formContainer.classList.remove('hidden');
+
+  entries.forEach(([key, def]) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col gap-1';
+
+    const label = document.createElement('label');
+    label.className = 'text-xs text-gray-400';
+    label.htmlFor = `field-${key}`;
+    label.innerHTML = key + (required.has(key) ? ' <span class="text-red-400">*</span>' : '');
+
+    let input;
+
+    if (def.type === 'boolean') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.id = `field-${key}`;
+      input.dataset.key = key;
+      input.dataset.type = 'boolean';
+      input.checked = def.default !== false;
+      input.className = 'w-4 h-4 accent-blue-500 mt-1';
+    } else if (def.type === 'number' || def.type === 'integer') {
+      input = document.createElement('input');
+      input.type = 'number';
+      input.id = `field-${key}`;
+      input.dataset.key = key;
+      input.dataset.type = def.type;
+      if (def.default !== undefined) input.value = def.default;
+      input.placeholder = def.description ?? key;
+      input.className = 'bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+    } else if (def.enum) {
+      input = document.createElement('select');
+      input.id = `field-${key}`;
+      input.dataset.key = key;
+      input.dataset.type = 'enum';
+      input.className = 'bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+      def.enum.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        if (v === def.default) opt.selected = true;
+        input.appendChild(opt);
+      });
+    } else {
+      const isDate = key === 'peildatum' || (def.description ?? '').includes('YYYY-MM-DD');
+      input = document.createElement('input');
+      input.type = isDate ? 'date' : 'text';
+      input.id = `field-${key}`;
+      input.dataset.key = key;
+      input.dataset.type = 'string';
+      if (def.default !== undefined) input.value = def.default;
+      if (!isDate) input.placeholder = def.description ?? key;
+      input.className = 'bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+    }
+
+    input.addEventListener('input', updateRequestPreview);
+    input.addEventListener('change', updateRequestPreview);
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(input);
+    formFields.appendChild(wrapper);
+  });
+}
+
+// ─── Args uitlezen ──────────────────────────────────────
+function collectArgs() {
+  const args = {};
+  formFields.querySelectorAll('[data-key]').forEach(el => {
+    const key = el.dataset.key;
+    const type = el.dataset.type;
+    if (type === 'boolean') {
+      args[key] = el.checked;
+    } else if (type === 'number' || type === 'integer') {
+      if (el.value !== '') args[key] = type === 'integer' ? parseInt(el.value) : parseFloat(el.value);
+    } else {
+      if (el.value !== '') args[key] = el.value;
+    }
+  });
+  return args;
+}
+
+// ─── Request-preview bijwerken ───────────────────────────
+function updateRequestPreview() {
+  if (!currentTool) return;
+  const payload = { tool: currentTool.name, args: collectArgs() };
+  renderJSON(requestPanel, payload);
+}
+
+// ─── Tool uitvoeren ──────────────────────────────────────
+runBtn.addEventListener('click', async () => {
+  if (!currentTool) return;
+  runBtn.disabled = true;
+  runBtn.textContent = '⏳ Bezig…';
+  responsePanel.textContent = '— wachten op response… —';
+  durationBadge.classList.add('hidden');
+
+  const payload = { tool: currentTool.name, args: collectArgs() };
+
+  try {
+    const res = await fetch('/api/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      renderError(responsePanel, data.error);
+    } else {
+      renderJSON(responsePanel, data.result);
+    }
+  } catch (err) {
+    renderError(responsePanel, { message: err.message });
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = '▶ Uitvoeren';
+  }
+});
+
+// ─── SSE log ────────────────────────────────────────────
+function appendSSELog(type, message) {
+  const line = document.createElement('div');
+  const ts = new Date().toLocaleTimeString('nl-NL', { hour12: false });
+  const colors = {
+    system:   'text-gray-600',
+    request:  'text-blue-400',
+    response: 'text-green-400',
+    ping:     'text-gray-700',
+  };
+  line.className = `${colors[type] ?? 'text-gray-400'}`;
+  line.textContent = `${ts}  [${type.padEnd(8)}]  ${message}`;
+  sseLog.appendChild(line);
+  sseLog.scrollTop = sseLog.scrollHeight;
+}
+
+clearBtn.addEventListener('click', () => { sseLog.innerHTML = ''; });
+
+// ─── JSON renderer ───────────────────────────────────────
+function renderJSON(el, value) {
+  el.innerHTML = syntaxHighlight(JSON.stringify(value, null, 2));
+}
+
+function renderError(el, error) {
+  const text = typeof error === 'string' ? error : JSON.stringify(error, null, 2);
+  el.innerHTML = `<span class="text-red-400">${escapeHtml(text)}</span>`;
+}
+
+function syntaxHighlight(json) {
+  return escapeHtml(json).replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    (match) => {
+      let cls = 'json-num';
+      if (/^"/.test(match)) {
+        cls = /:$/.test(match) ? 'json-key' : 'json-str';
+      } else if (/true|false/.test(match)) {
+        cls = 'json-bool';
+      } else if (/null/.test(match)) {
+        cls = 'json-null';
+      }
+      return `<span class="${cls}">${match}</span>`;
+    }
+  );
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Init ────────────────────────────────────────────────
+connectSSE();
+loadTools();
+</script>
+</body>
+</html>

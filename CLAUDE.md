@@ -24,7 +24,17 @@ Het primaire werkinstrument is `/jas` (artikel-annotatie conform JAS v1.0.10). D
 
 ---
 
-## MCP wettenbank
+## MCP wettenbank — weergave van resultaten
+
+Toon MCP-resultaten altijd **verbatim** in het Markdown-formaat dat de server produceert (zie `wettenbank-mcp/README.md` §3). Vat ze nooit samen, parafraseer ze niet en herformatteer ze niet — tenzij de gebruiker dat expliciet vraagt.
+
+- **`wettenbank_zoek`** → toon het volledige resultaatblok inclusief `## Resultaten`-header, `Query:`-regel en alle regelingvermeldingen.
+- **`wettenbank_artikel`** → toon de volledige output: header (`[Citeertitel] > Versie geldig op:`), structuurregels (hoofdstuk/afdeling), artikeltekst met lidnummering en `Bronreferentie:`-regel.
+- **`wettenbank_zoekterm`** → toon de volledige output: header, samenvattingsregel met treffer-/artikeltelling, en alle artikel-entries met `→ wettenbank_artikel(...)`-aanroepen.
+
+---
+
+## MCP wettenbank — tools
 
 Drie tools met elk één verantwoordelijkheid:
 - **`wettenbank_zoek`** — naam → BWB-id + metadata (puur SRU-metadata, geen wetstekst)
