@@ -137,6 +137,18 @@ describe("parseZoekterm", () => {
     expect("patronen" in result && result.patronen[1].source).toBe("\\bafstel\\b");
   });
 
+  it("AND wordt herkend als alias voor EN", () => {
+    const result = parseZoekterm("aansprakelijk AND belasting");
+    expect("operator" in result && result.operator).toBe("EN");
+    expect("patronen" in result && result.patronen).toHaveLength(2);
+  });
+
+  it("OR wordt herkend als alias voor OF", () => {
+    const result = parseZoekterm("uitstel OR afstel");
+    expect("operator" in result && result.operator).toBe("OF");
+    expect("patronen" in result && result.patronen).toHaveLength(2);
+  });
+
   it("wildcards worden correct doorgegeven via parseZoekterm", () => {
     const result = parseZoekterm("termijn*");
     expect("patronen" in result && result.patronen[0].source).toBe("\\btermijn\\w*");

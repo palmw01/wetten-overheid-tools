@@ -33,7 +33,7 @@ The entire server lives in `src/index.ts`. It exposes three tools:
 
 **Data flow (wettenbank_artikel):** `haalWetstekstOp()` fetches regulation via SRU + repository. `extraheerArtikelUitXml()` returns `{ tekst, structuurpad, leden }` via DOM-traversal (`formateerArtikelNode` splits context from article text and collects per-lid objects). `parseerArtikelParam()` handles `N.M`-notation for lid-filter. `extraheerDocMetadata()` provides citeertitel + versiedatum. `detecteerArtikelStatus()` provides the `waarschuwing`. `bouwJciUri()` provides the `bronreferentie`. All assembled as `JSON.stringify({...})`.
 
-**Data flow (wettenbank_zoekterm):** `zoekTermInArtikelDom()` groups matches per article node from XML DOM. `parseZoekterm()` handles EN/OF operators. Returns `JSON.stringify({ wet, versiedatum, bwbId, zoekterm, totaalTreffers, aantalArtikelen, artikelen })`.
+**Data flow (wettenbank_zoekterm):** `zoekTermInArtikelDom()` groups matches per article node from XML DOM. `parseZoekterm()` handles EN/OF operators (AND/OR accepted as aliases). Returns `JSON.stringify({ wet, versiedatum, bwbId, zoekterm, totaalTreffers, aantalArtikelen, artikelen })`.
 
 ### `wettenbank_zoekterm` — wildcards en operatoren
 
@@ -46,7 +46,7 @@ The entire server lives in `src/index.ts`. It exposes three tools:
 | `*termijn` | `\w*termijn\b` | `termijn`, `betalingstermijn` |
 | `*termijn*` | `\w*termijn\w*` | alles met `termijn` erin |
 
-`parseZoekterm(zoekterm)` splitst op ` EN ` of ` OF ` en geeft een `ZoekInput` terug met `patronen: RegExp[]` en `operator: "EN"|"OF"`. `zoekTermInArtikelDom` filtert bij EN af op artikelen waar alle patronen minstens één keer voorkomen.
+`parseZoekterm(zoekterm)` normaliseert eerst ` AND ` → ` EN ` en ` OR ` → ` OF `, splitst daarna op ` EN ` of ` OF `, en geeft een `ZoekInput` terug met `patronen: RegExp[]` en `operator: "EN"|"OF"`. `zoekTermInArtikelDom` filtert bij EN af op artikelen waar alle patronen minstens één keer voorkomen.
 
 Speciale tekens worden vooraf geescapet via `escapeerRegex()`.
 

@@ -161,21 +161,23 @@ export type ZoekInput =
  * Parseert een zoekterm met optionele EN/OF-operatoren naar een ZoekInput.
  * Elke deelterm wordt via bouwTermPatroon omgezet naar een regex met woordgrenzen en wildcards.
  * Voorbeeld: "aansprakelijk EN belasting" → operator EN, twee patronen.
+ * AND en OR worden herkend als aliassen voor EN en OF.
  */
 export function parseZoekterm(zoekterm: string): ZoekInput {
-  if (zoekterm.includes(" EN ")) {
+  const genormaliseerd = zoekterm.replace(/ AND /g, " EN ").replace(/ OR /g, " OF ");
+  if (genormaliseerd.includes(" EN ")) {
     return {
       operator: "EN",
-      patronen: zoekterm.split(" EN ").map(d => new RegExp(bouwTermPatroon(d.trim()), "gi")),
+      patronen: genormaliseerd.split(" EN ").map(d => new RegExp(bouwTermPatroon(d.trim()), "gi")),
     };
   }
-  if (zoekterm.includes(" OF ")) {
+  if (genormaliseerd.includes(" OF ")) {
     return {
       operator: "OF",
-      patronen: zoekterm.split(" OF ").map(d => new RegExp(bouwTermPatroon(d.trim()), "gi")),
+      patronen: genormaliseerd.split(" OF ").map(d => new RegExp(bouwTermPatroon(d.trim()), "gi")),
     };
   }
-  return { operator: "OF", patronen: [new RegExp(bouwTermPatroon(zoekterm.trim()), "gi")] };
+  return { operator: "OF", patronen: [new RegExp(bouwTermPatroon(genormaliseerd.trim()), "gi")] };
 }
 
 export function bouwJciUri(bwbId: string, artikel: string, lid?: string): string {
@@ -784,7 +786,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         "Retourneert een lijst van artikelnummers met treffertellingen en directe aanroepvoorbeelden voor wettenbank_artikel. " +
         "Wildcards: 'termijn*' (begint met), '*termijn' (eindigt op), '*termijn*' (bevat). " +
         "Zonder wildcard: exacte woordmatch ('termijn' matcht NIET 'termijnen'). " +
-        "Operatoren: 'aansprakelijk EN belasting' (beide aanwezig), 'uitstel OF afstel' (minstens één). " +
+        "Operatoren: 'aansprakelijk EN belasting' of 'aansprakelijk AND belasting' (beide aanwezig), 'uitstel OF afstel' of 'uitstel OR afstel' (minstens één). " +
         "Geeft expliciet aan als de term nergens gevonden is. " +
         "Optioneel: peildatum (YYYY-MM-DD) voor een historische versie; default is vandaag.",
       inputSchema: {
@@ -797,7 +799,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             description:
               "Te zoeken begrip. Zonder wildcard: exacte woordmatch. " +
               "Wildcards: 'termijn*' (begint met), '*termijn' (eindigt op), '*termijn*' (bevat). " +
-              "Operatoren: 'aansprakelijk EN belasting' (beide aanwezig in artikel), 'uitstel OF afstel' (minstens één).",
+              "Operatoren: 'aansprakelijk EN belasting' of 'aansprakelijk AND belasting' (beide aanwezig in artikel), 'uitstel OF afstel' of 'uitstel OR afstel' (minstens één).",
           },
           peildatum: { type: "string", description: "Datum YYYY-MM-DD voor historische versie; default is vandaag." },
         },

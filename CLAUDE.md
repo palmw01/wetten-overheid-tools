@@ -57,4 +57,4 @@ Drie tools met elk één verantwoordelijkheid:
   }
   ```
   Bij niet-gevonden: `fout`-veld in plaats van `structuurpad`/`leden`. Vervallen artikelen hebben een niet-null `waarschuwing`.
-- **`wettenbank_zoekterm`** — BWB-id + zoekterm → JSON met `artikelen`-array (artikel, aantalTreffers, leden). Wildcards: `termijn*`, `*termijn`, `*termijn*`. EN/OF-operatoren: `aansprakelijk EN belasting`.
+- **`wettenbank_zoekterm`** — BWB-id + zoekterm → JSON met `artikelen`-array (artikel, aantalTreffers, leden). Wildcards: `termijn*`, `*termijn`, `*termijn*`. EN/OF-operatoren: `aansprakelijk EN belasting`. AND/OR worden herkend als aliassen voor EN/OF.
