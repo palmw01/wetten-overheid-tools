@@ -30,7 +30,7 @@ De Wettenbank MCP-server maakt het mogelijk om **vanuit Claude Code rechtstreeks
 | Tool                   | Doel                                                                 |
 |------------------------|----------------------------------------------------------------------|
 | `wettenbank_zoek`      | Regelingen zoeken op titel, rechtsgebied, ministerie of regelingsoort; retourneert **JSON** met `regelingen`-array; optioneel `peildatum` (standaard vandaag) |
-| `wettenbank_artikel`   | Één specifiek artikel ophalen via BWB-id + artikelnummer; retourneert **JSON** met `tekst`, `structuurpad`, `bronreferentie` etc.; optioneel historische versie via `peildatum` |
+| `wettenbank_artikel`   | Één specifiek artikel ophalen via BWB-id + artikelnummer; retourneert **JSON** met `tekst`, `leden`, `structuurpad`, `bronreferentie` etc.; optioneel historische versie via `peildatum` |
 | `wettenbank_zoekterm`  | Zoeken welke artikelen een begrip bevatten; retourneert **JSON** met `artikelen`-array; wildcards (`termijn*`, `*termijn`) en EN/OF-operatoren |
 
 ---
@@ -165,13 +165,17 @@ Haalt één artikel op uit een regeling via BWB-id en artikelnummer. De response
     "Hoofdstuk II — Invordering in eerste aanleg",
     "Afdeling 1 — Betalingstermijnen"
   ],
+  "leden": [
+    { "lid": "1", "tekst": "9.1  Een belastingaanslag is invorderbaar zes weken na de dagtekening van het aanslagbiljet." },
+    { "lid": "2", "tekst": "9.2  In afwijking van het eerste lid is een navorderingsaanslag..." }
+  ],
   "tekst": "Artikel 9 Betalingstermijnen\n9.1  Een belastingaanslag is invorderbaar...",
   "bronreferentie": "jci1.3:c:BWBR0004770&artikel=9",
   "waarschuwing": null
 }
 ```
 
-`citeertitel` en `versiedatum` komen uit de `<citeertitel>` en het `inwerkingtreding`-attribuut in de BWB-toestand XML; bij ontbreken wordt de SRU-metadata gebruikt. `structuurpad` is een lege array `[]` als het artikel geen structuurancestors heeft. `waarschuwing` bevat een tekst als het artikel de status `"vervallen"` heeft, anders `null`.
+`citeertitel` en `versiedatum` komen uit de `<citeertitel>` en het `inwerkingtreding`-attribuut in de BWB-toestand XML; bij ontbreken wordt de SRU-metadata gebruikt. `structuurpad` is een lege array `[]` als het artikel geen structuurancestors heeft. `leden` is een array van objecten `{ lid: string, tekst: string }` per genummerd lid; leeg `[]` als het artikel geen genummerde leden heeft. `waarschuwing` bevat een tekst als het artikel de status `"vervallen"` heeft, anders `null`.
 
 Niet-gevonden: `{ "citeertitel": "...", "versiedatum": "...", "bwbId": "...", "artikel": "999", "fout": "Artikel 999 niet gevonden in deze wet." }`
 
@@ -261,7 +265,7 @@ searchRetrieveResponse
 | `renderAl()`                | ja            | Zet inline `<al>`-markup om naar Markdown: `<extref>` → link, `<nadruk>` → vet/cursief, dan `stripXml` |
 | `getAlText()`               | ja            | Extraheert tekstinhoud van een `<al>`-element; voorkomt `[object Object]` bij `<al>`-nodes met attributen |
 | `parseerArtikelParam()`     | ja            | Splitst `"9.1"` → `{artikelnr:"9", lidnr:"1"}`; Leidraad-subartikelen worden eerst exact opgezocht |
-| `extraheerArtikelUitXml()`  | ja            | DOM-gebaseerde artikel-extractie; retourneert `{ tekst, structuurpad }` of `null` |
+| `extraheerArtikelUitXml()`  | ja            | DOM-gebaseerde artikel-extractie; retourneert `{ tekst, structuurpad, leden }` of `null` |
 | `extraheerArtikel()`        | ja            | Regex-gebaseerde artikel-extractie uit platte tekst (fallback)          |
 | `detecteerArtikelStatus()`  | ja            | Controleert `@_status` op de artikel-node; geeft waarschuwing bij `"vervallen"` |
 | `zoekTermInArtikelDom()`    | ja            | DOM-gebaseerde term-zoekfunctie voor `wettenbank_zoekterm`; per artikel-node; zoekt recursief in geneste `<lijst>`-nodes via interne helper `telInLijst()` |
@@ -272,7 +276,7 @@ searchRetrieveResponse
 | `bouwTermPatroon()`         | ja            | Bouwt regex-patroon met woordgrenzen; wildcards `*` voor/na de term     |
 | `parseZoekterm()`           | ja            | Splitst op ` EN `/` OF `; geeft `ZoekInput` met `patronen` + `operator`|
 | `zoekArtikelInDom()`        | nee           | Recursieve DOM-traversal voor artikel-lookup (max. diepte: 30)          |
-| `formateerArtikelNode()`    | nee           | Zet een XML-artikelnode om naar `{ tekst, structuurpad }`               |
+| `formateerArtikelNode()`    | nee           | Zet een XML-artikelnode om naar `{ tekst, structuurpad, leden }`        |
 | `vandaag()`                 | nee           | Geeft de huidige datum terug als `YYYY-MM-DD`                           |
 
 ---
@@ -320,7 +324,7 @@ Zoekt de dichtstbijzijnde artikelkop **vóór** `matchIndex`. Regex: `/Artikel\s
 
 ### 5.5  `extraheerArtikelUitXml(rawXml, artikelnummer)`
 
-**Primaire** methode voor artikel-extractie. Retourneert `{ tekst: string; structuurpad: string[] } | null`. `tekst` is de letterlijke artikeltekst (kop + leden); `structuurpad` is de ancestor-keten als array van strings (bijv. `["Hoofdstuk II — ...", "Afdeling 1 — ..."]`). Gebruikt DOM-traversal via `fast-xml-parser`.
+**Primaire** methode voor artikel-extractie. Retourneert `{ tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null`. `tekst` is de letterlijke artikeltekst (kop + leden aaneengesloten); `structuurpad` is de ancestor-keten als array van strings (bijv. `["Hoofdstuk II — ...", "Afdeling 1 — ..."]`); `leden` is een array per genummerd lid met `lid` (lidnummer als string) en `tekst` (de opgemaakte lidtekst). Gebruikt DOM-traversal via `fast-xml-parser`.
 
 **Zoekstrategie van `zoekArtikelInDom`:**
 
@@ -496,7 +500,7 @@ Alle geëxporteerde functies zijn gedekt door unit tests in `src/index.test.ts`:
 | `renderAl`                        | `<extref>` → Markdown-link; `<nadruk type="vet">` → `**vet**`; `<intref>` → cursief; onbekende tags weggegooid |
 | `bouwJciUri`                      | Standaard-format; Awb-nummers met dubbele punt; Leidraad-subartikelen               |
 | `extraheerArtikel`                | Artikel op nummer; dubbele punt (Awb); null-fallback; metadata stripping            |
-| `extraheerArtikelUitXml`          | Reguliere wet; Awb (`:` in nr); Leidraad (`circulaire.divisie`); subartikel; `structuurpad`-array; depth-limit; lege XML |
+| `extraheerArtikelUitXml`          | Reguliere wet; Awb (`:` in nr); Leidraad (`circulaire.divisie`); subartikel; `structuurpad`-array; `leden`-array; depth-limit; lege XML |
 | `detecteerArtikelStatus`          | Null bij "geldend"; waarschuwing bij "vervallen"; null bij lege XML                 |
 | `zoekTermInArtikelDom`            | Juist artikel; meerdere treffers; lege array; kruisverwijzing; woordgrens; prefix/suffix-wildcard; EN/OF-operator; `<lid>`-tekst; geneste `<lijst>`-nodes |
 | `extraheerDocMetadata`            | Citeertitel + versiedatum (`inwerkingtreding`-attribuut) uit `<toestand>`-structuur; lege strings als structuur ontbreekt |

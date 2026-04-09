@@ -383,7 +383,7 @@ function formatLidNode(lid: Record<string, unknown>, parts: string[], artikelnr?
 function formateerArtikelNode(
   match: ArtikelMatch,
   lidFilter?: string
-): { tekst: string; structuurpad: string[] } {
+): { tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } {
   const { node, context } = match;
   const kop = node.kop as Record<string, unknown> | undefined;
   const nr = kop ? getNrValue(kop.nr) : "";
@@ -400,6 +400,7 @@ function formateerArtikelNode(
   // Artikeltekst: kop + inhoud, zonder de structuurpad-regels
   const parts: string[] = [];
   parts.push(titel ? `Artikel ${nr} ${titel}` : `Artikel ${nr}`);
+  const ledenArray: { lid: string; tekst: string }[] = [];
 
   if (lidFilter) {
     // Toon alleen het gevraagde lid
@@ -409,14 +410,17 @@ function formateerArtikelNode(
         return lidnr === lidFilter;
       });
       if (gevondenLid) {
-        formatLidNode(gevondenLid, parts, nr);
+        const lidParts: string[] = [];
+        formatLidNode(gevondenLid, lidParts, nr);
+        parts.push(...lidParts);
+        ledenArray.push({ lid: lidFilter, tekst: lidParts.join("\n").trim() });
       } else {
         parts.push(`(Lid ${lidFilter} niet gevonden in dit artikel)`);
       }
     } else {
       parts.push(`(Dit artikel heeft geen genummerde leden)`);
     }
-    return { tekst: parts.join("\n").trim(), structuurpad };
+    return { tekst: parts.join("\n").trim(), structuurpad, leden: ledenArray };
   }
 
   // Directe <al> (artikel zonder lid, of preamble-tekst boven lid-lijst)
@@ -434,7 +438,11 @@ function formateerArtikelNode(
   // <lid> elementen (XSD: class.lid — bevat lidnr + structuur.maximaal*)
   if (Array.isArray(node.lid)) {
     for (const lid of node.lid as Record<string, unknown>[]) {
-      formatLidNode(lid, parts, nr);
+      const lidnr = lid.lidnr != null ? getNrValue(lid.lidnr) : "";
+      const lidParts: string[] = [];
+      formatLidNode(lid, lidParts, nr);
+      parts.push(...lidParts);
+      ledenArray.push({ lid: lidnr, tekst: lidParts.join("\n").trim() });
     }
   }
 
@@ -445,7 +453,7 @@ function formateerArtikelNode(
     for (const al of als) parts.push(renderAl(getAlText(al)));
   }
 
-  return { tekst: parts.join("\n").trim(), structuurpad };
+  return { tekst: parts.join("\n").trim(), structuurpad, leden: ledenArray };
 }
 
 /**
@@ -458,7 +466,7 @@ export function extraheerArtikelUitXml(
   rawXml: string,
   artikelnummer: string,
   lidFilter?: string
-): { tekst: string; structuurpad: string[] } | null {
+): { tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null {
   try {
     const dom = wetParser.parse(rawXml) as Record<string, unknown>;
     const found = zoekArtikelInDom(dom, artikelnummer);
@@ -849,7 +857,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Ophaalstrategie bij N.M-notatie:
       // 1. Probeer het volledige artikelnummer exact (Leidraad: "25.1" is een eigen sub-artikel)
       // 2. Als niet gevonden én er was een punt: probeer artikel N met lid-filter M
-      let artikelResultaat: { tekst: string; structuurpad: string[] } | null = null;
+      let artikelResultaat: { tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null = null;
       let gebruiktArtikel = artikel;
       let gebruiktLid: string | null = null;
 
@@ -867,6 +875,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Fallback naar tekstgebaseerde extractie (geen lid-filter of structuurpad beschikbaar)
       let artikelTekst: string | null = artikelResultaat?.tekst ?? null;
       const structuurpad: string[] = artikelResultaat?.structuurpad ?? [];
+      const leden: { lid: string; tekst: string }[] = artikelResultaat?.leden ?? [];
       if (!artikelTekst) {
         artikelTekst = extraheerArtikel(inhoud, artikel) ?? (lidnr !== null ? extraheerArtikel(inhoud, artikelnr) : null);
         if (artikelTekst && lidnr !== null) gebruiktArtikel = artikelnr;
@@ -885,6 +894,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               bwbId,
               artikel: gebruiktArtikel,
               structuurpad,
+              leden,
               tekst: artikelTekst,
               bronreferentie: jci,
               waarschuwing: statusWaarschuwing ?? null,

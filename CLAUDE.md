@@ -29,7 +29,7 @@ Het primaire werkinstrument is `/jas` (artikel-annotatie conform JAS v1.0.10). D
 De MCP-tools retourneren **pure JSON** (geen Markdown). Parseer de JSON-velden en presenteer de data relevant voor de vraag van de gebruiker.
 
 - **`wettenbank_zoek`** → JSON met `query`, `totaal`, `dubbeleVerwijderd` en `regelingen` (array). Toon titel, BWB-id en relevante metadata per regeling.
-- **`wettenbank_artikel`** → JSON met `citeertitel`, `versiedatum`, `structuurpad` (array), `tekst`, `bronreferentie` en `waarschuwing`. Toon `tekst` letterlijk; gebruik `structuurpad` voor structuurcontext; vermeld `bronreferentie` als bron.
+- **`wettenbank_artikel`** → JSON met `citeertitel`, `versiedatum`, `structuurpad` (array), `leden` (array per lid: `{ lid, tekst }`), `tekst`, `bronreferentie` en `waarschuwing`. Toon `tekst` letterlijk; gebruik `structuurpad` voor structuurcontext; gebruik `leden` voor analyse per lid; vermeld `bronreferentie` als bron.
 - **`wettenbank_zoekterm`** → JSON met `wet`, `versiedatum`, `zoekterm`, `totaalTreffers`, `aantalArtikelen` en `artikelen` (array met `artikel`, `aantalTreffers`, `leden`). Presenteer als overzicht; gebruik de artikelnummers om gericht `wettenbank_artikel` aan te roepen.
 
 Bij een `fout`-veld in de response: meld dit aan de gebruiker met de foutboodschap.
@@ -48,10 +48,14 @@ Drie tools met elk één verantwoordelijkheid:
     "bwbId": "BWBR0004770",
     "artikel": "25",
     "structuurpad": ["Hoofdstuk IV — ...", "Afdeling 1 — ..."],
+    "leden": [
+      { "lid": "1", "tekst": "25.1  ..." },
+      { "lid": "2", "tekst": "25.2  ..." }
+    ],
     "tekst": "Artikel 25 ...",
     "bronreferentie": "jci1.3:c:BWBR0004770&artikel=25",
     "waarschuwing": null
   }
   ```
-  Bij niet-gevonden: `fout`-veld in plaats van `tekst`/`structuurpad`. Vervallen artikelen hebben een niet-null `waarschuwing`.
+  Bij niet-gevonden: `fout`-veld in plaats van `tekst`/`structuurpad`/`leden`. Vervallen artikelen hebben een niet-null `waarschuwing`.
 - **`wettenbank_zoekterm`** — BWB-id + zoekterm → JSON met `artikelen`-array (artikel, aantalTreffers, leden). Wildcards: `termijn*`, `*termijn`, `*termijn*`. EN/OF-operatoren: `aansprakelijk EN belasting`.

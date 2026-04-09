@@ -66,6 +66,7 @@ De tool-resultaten zijn **JSON**. Extraheer per response de volgende velden:
 - `citeertitel` — naam van de wet (bijv. `"Invorderingswet 1990"`)
 - `versiedatum` — geldigheidspeildatum van de opgehaalde versie (YYYY-MM-DD); noteer als `[PD]`
 - `tekst` — de volledige letterlijke wetstekst van het artikel (kopieer woordelijk)
+- `leden` — array van objecten `{ lid: string, tekst: string }` per genummerd lid; gebruik dit voor de annotatie per lid (§4); leeg `[]` als het artikel geen genummerde leden heeft
 - `structuurpad` — array van structuurniveaus boven het artikel (bijv. `["Hoofdstuk II — Invordering in eerste aanleg", "Afdeling 1 — Betalingstermijnen"]`)
 - `bronreferentie` — JCI-uri (bijv. `"jci1.3:c:BWBR0004770&artikel=25"`); gebruik letterlijk in Bijlage B
 - `waarschuwing` — `null` of een waarschuwingstekst als het artikel een bijzondere status heeft
