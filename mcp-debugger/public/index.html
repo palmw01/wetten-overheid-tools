@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MCP Debugger</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta name="theme-color" content="#030712" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -56,6 +61,73 @@
     ::-webkit-scrollbar { width:4px; height:4px; }
     ::-webkit-scrollbar-track { background:transparent; }
     ::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+
+    /* ── Main layout ─────────────────────────────────────────────────── */
+    #main-area {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #panes-row {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+    #req-pane, #resp-pane {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #stream-pane {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 7rem;
+    }
+
+    /* ── Resize handles (desktop only) ──────────────────────────────── */
+    .rh {
+      background: #1e293b;
+      flex-shrink: 0;
+      transition: background 0.1s;
+      z-index: 10;
+    }
+    .rh:hover, .rh.active { background: #3b82f6; }
+    .rh-v { width: 4px; cursor: col-resize; }
+    .rh-h { height: 4px; cursor: row-resize; }
+
+    /* ── Mobile tab bar ──────────────────────────────────────────────── */
+    #mobile-tabbar { display: none; }
+
+    @media (max-width: 767px) {
+      .rh { display: none !important; }
+
+      #mobile-tabbar {
+        display: flex;
+        flex-shrink: 0;
+        background: #111827;
+        border-top: 1px solid #1f2937;
+      }
+      .mob-tab {
+        flex: 1;
+        padding: .55rem 0;
+        font-size: .7rem;
+        text-align: center;
+        cursor: pointer;
+        color: #64748b;
+        border-top: 2px solid transparent;
+        background: transparent;
+        font-family: inherit;
+      }
+      .mob-tab.active {
+        color: #fff;
+        border-top-color: #3b82f6;
+      }
+    }
   </style>
 </head>
 
@@ -65,7 +137,7 @@
 <header class="flex-none flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
   <div class="flex items-center gap-2">
     <span class="font-bold text-white tracking-tight text-sm">MCP Debugger</span>
-    <span class="text-xs text-gray-600">v1.0</span>
+    <span class="text-xs text-gray-600">v1.1</span>
   </div>
   <div class="flex items-center gap-2">
     <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-600 inline-block"></span>
@@ -81,63 +153,93 @@
       class="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
       <option value="">— laden —</option>
     </select>
+    <!-- Info toggle: toelichting in/uitklappen -->
+    <button id="info-btn"
+      title="Toelichting tonen/verbergen"
+      class="flex-none w-7 h-7 flex items-center justify-center rounded border text-xs transition-colors bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500">
+      ⓘ
+    </button>
     <button id="run-btn"
       class="flex-none px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded font-medium whitespace-nowrap">
       Uitvoeren
     </button>
   </div>
 
+  <!-- Description: verborgen tot ⓘ geklikt wordt -->
+  <p id="tool-description" class="hidden text-xs text-gray-500 italic leading-relaxed border-l-2 border-gray-700 pl-2"></p>
+
   <div id="form-container" class="hidden">
     <div id="form-fields" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
   </div>
-
-  <p id="tool-description" class="hidden text-xs text-gray-500 italic leading-relaxed"></p>
 </div>
 
-<!-- HOOFD-PANELEN
-     Mobile:  grid met 2 rijen (elk 50% hoogte)
-     Desktop: grid met 2 kolommen naast elkaar
--->
-<div class="flex-1 min-h-0 grid grid-rows-2 md:grid-rows-1 md:grid-cols-2 border-b border-gray-800">
+<!-- MAIN AREA -->
+<div id="main-area">
 
-  <!-- Request -->
-  <div class="overflow-hidden flex flex-col border-b md:border-b-0 md:border-r border-gray-800">
-    <div class="flex-none px-4 py-1.5 bg-gray-900 border-b border-gray-800">
-      <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Request</span>
-    </div>
-    <pre id="request-panel" class="flex-1 overflow-auto p-3 text-xs text-gray-500 bg-gray-950">— nog geen aanvraag —</pre>
-  </div>
+  <!-- PANES ROW: Request + verticale handle + Response -->
+  <div id="panes-row">
 
-  <!-- Response -->
-  <div class="overflow-hidden flex flex-col">
-    <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-      <div class="flex gap-4">
-        <button id="tab-btn-formatted" class="tab-on text-xs py-1.5 transition-colors" onclick="switchTab('formatted')">Opgemaakt</button>
-        <button id="tab-btn-raw"       class="tab-off text-xs py-1.5 transition-colors" onclick="switchTab('raw')">JSON</button>
+    <!-- Request -->
+    <div id="req-pane" class="border-r border-gray-800">
+      <div class="flex-none px-4 py-1.5 bg-gray-900 border-b border-gray-800">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Request</span>
       </div>
-      <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
+      <pre id="request-panel" class="flex-1 overflow-auto p-3 text-xs text-gray-500 bg-gray-950">— nog geen aanvraag —</pre>
     </div>
-    <div id="response-formatted" class="flex-1 overflow-auto p-3 text-sm bg-gray-950 md leading-relaxed">
-      <span class="text-gray-600 text-xs">— nog geen response —</span>
+
+    <!-- Verticale resize handle (desktop) -->
+    <div class="rh rh-v" id="handle-v"></div>
+
+    <!-- Response -->
+    <div id="resp-pane">
+      <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+        <div class="flex gap-4">
+          <button id="tab-btn-formatted" class="tab-on text-xs py-1.5 transition-colors" onclick="switchTab('formatted')">Opgemaakt</button>
+          <button id="tab-btn-raw"       class="tab-off text-xs py-1.5 transition-colors" onclick="switchTab('raw')">JSON</button>
+        </div>
+        <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
+      </div>
+      <div id="response-formatted" class="flex-1 overflow-auto p-3 text-sm bg-gray-950 md leading-relaxed">
+        <span class="text-gray-600 text-xs">— nog geen response —</span>
+      </div>
+      <pre id="response-raw" class="hidden flex-1 overflow-auto p-3 text-xs text-gray-300 bg-gray-950">— nog geen response —</pre>
     </div>
-    <pre id="response-raw" class="hidden flex-1 overflow-auto p-3 text-xs text-gray-300 bg-gray-950">— nog geen response —</pre>
+
+  </div>
+
+  <!-- Horizontale resize handle (desktop) -->
+  <div class="rh rh-h" id="handle-h"></div>
+
+  <!-- Stream -->
+  <div id="stream-pane" class="border-t border-gray-800">
+    <div class="flex-none px-4 py-1 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Stream</span>
+        <!-- Collapse knop (desktop) -->
+        <button id="stream-collapse-btn"
+          title="Minimaliseren/uitklappen"
+          class="hidden md:flex items-center justify-center w-4 h-4 text-gray-600 hover:text-gray-400 text-xs"
+          onclick="toggleStream()">▾</button>
+      </div>
+      <button id="clear-btn" class="text-xs text-gray-700 hover:text-gray-400">leeg</button>
+    </div>
+    <div id="sse-log" class="flex-1 overflow-auto px-3 py-1 text-xs space-y-0.5 bg-gray-950"></div>
   </div>
 
 </div>
 
-<!-- SSE STREAM -->
-<div class="flex-none flex flex-col border-gray-800" style="height:7rem;">
-  <div class="flex-none px-4 py-1 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Stream</span>
-    <button id="clear-btn" class="text-xs text-gray-700 hover:text-gray-400">leeg</button>
-  </div>
-  <div id="sse-log" class="flex-1 overflow-auto px-3 py-1 text-xs space-y-0.5 bg-gray-950"></div>
-</div>
+<!-- MOBILE TAB BAR -->
+<nav id="mobile-tabbar">
+  <button class="mob-tab active" data-target="resp" onclick="setMobTab(this,'resp')">Respons</button>
+  <button class="mob-tab"        data-target="req"    onclick="setMobTab(this,'req')">Request</button>
+  <button class="mob-tab"        data-target="stream" onclick="setMobTab(this,'stream')">Stream</button>
+</nav>
 
 <script>
 marked.setOptions({ breaks: true, gfm: true });
 
 let currentTool = null, tools = [], currentTab = 'formatted', lastResult = null;
+const isMobile = () => window.innerWidth < 768;
 
 const $ = id => document.getElementById(id);
 const statusDot     = $('status-dot');
@@ -152,8 +254,111 @@ const respFmt       = $('response-formatted');
 const respRaw       = $('response-raw');
 const durBadge      = $('duration-badge');
 const sseLog        = $('sse-log');
+const reqPane       = $('req-pane');
+const respPane      = $('resp-pane');
+const streamPane    = $('stream-pane');
+const panesRow      = $('panes-row');
+const handleH       = $('handle-h');
+const handleV       = $('handle-v');
 
-// Tabs
+// ── Mobile tabs ───────────────────────────────────────────────────────────
+let activeMobTab = 'resp';
+
+function setMobTab(btn, target) {
+  activeMobTab = target;
+  document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyMobileLayout();
+}
+
+function applyMobileLayout() {
+  if (!isMobile()) return;
+
+  // Reset inline flex/display for mobile
+  panesRow.style.flex = '';
+  reqPane.style.flex = '';
+  respPane.style.flex = '';
+
+  if (activeMobTab === 'stream') {
+    panesRow.style.display = 'none';
+    handleH.style.display = 'none';
+    streamPane.style.display = 'flex';
+    streamPane.style.flex = '1';
+    streamPane.style.height = 'auto';
+  } else {
+    panesRow.style.display = 'flex';
+    panesRow.style.flex = '1';
+    handleH.style.display = 'none';
+    streamPane.style.display = 'none';
+    streamPane.style.flex = '';
+    streamPane.style.height = '';
+
+    if (activeMobTab === 'req') {
+      reqPane.style.display = 'flex';
+      reqPane.style.flex = '1';
+      respPane.style.display = 'none';
+    } else {
+      respPane.style.display = 'flex';
+      respPane.style.flex = '1';
+      reqPane.style.display = 'none';
+    }
+  }
+}
+
+function resetDesktopLayout() {
+  [panesRow, reqPane, respPane, streamPane, handleH, handleV].forEach(el => {
+    el.style.cssText = '';
+  });
+  // Restore stream default height
+  streamPane.style.height = streamCollapsed ? '' : '7rem';
+}
+
+window.addEventListener('resize', () => {
+  if (isMobile()) {
+    applyMobileLayout();
+  } else {
+    resetDesktopLayout();
+  }
+});
+
+// Initieel
+if (isMobile()) applyMobileLayout();
+
+// ── Info / description toggle ─────────────────────────────────────────────
+$('info-btn').addEventListener('click', () => {
+  const nowHidden = toolDesc.classList.toggle('hidden');
+  const btn = $('info-btn');
+  if (nowHidden) {
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  } else {
+    btn.style.color = '#38bdf8';
+    btn.style.borderColor = '#38bdf8';
+  }
+});
+
+// ── Stream collapse (desktop) ─────────────────────────────────────────────
+let streamCollapsed = false;
+const STREAM_DEFAULT_H = 112; // 7rem
+
+function toggleStream() {
+  streamCollapsed = !streamCollapsed;
+  const log = $('sse-log');
+  const btn = $('stream-collapse-btn');
+  if (streamCollapsed) {
+    log.style.display = 'none';
+    streamPane.style.height = '';
+    btn.textContent = '▸';
+    btn.title = 'Uitklappen';
+  } else {
+    log.style.display = '';
+    streamPane.style.height = streamPane._savedH ? streamPane._savedH + 'px' : STREAM_DEFAULT_H + 'px';
+    btn.textContent = '▾';
+    btn.title = 'Minimaliseren';
+  }
+}
+
+// ── Response tabs ─────────────────────────────────────────────────────────
 function switchTab(tab) {
   currentTab = tab;
   $('tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
@@ -163,7 +368,7 @@ function switchTab(tab) {
   if (lastResult !== null) renderResponse(lastResult, false);
 }
 
-// SSE
+// ── SSE ───────────────────────────────────────────────────────────────────
 function connectSSE() {
   const es = new EventSource('/api/events');
   es.addEventListener('connected', () => {
@@ -181,7 +386,7 @@ function connectSSE() {
   };
 }
 
-// Tools
+// ── Tools ─────────────────────────────────────────────────────────────────
 async function loadTools() {
   try {
     const r = await fetch('/api/tools');
@@ -202,13 +407,21 @@ function selectTool(name) {
   currentTool = tools.find(t => t.name === name) ?? null;
   if (!currentTool) return;
   toolDesc.textContent = currentTool.description ?? '';
-  toolDesc.classList.toggle('hidden', !currentTool.description);
+  // Verberg description bij het wisselen van tool; gebruiker opent zelf
+  if (!toolDesc.classList.contains('hidden')) {
+    toolDesc.classList.add('hidden');
+    $('info-btn').style.color = '';
+    $('info-btn').style.borderColor = '';
+  }
+  const infoBtn = $('info-btn');
+  infoBtn.disabled = !currentTool.description;
+  infoBtn.style.opacity = currentTool.description ? '' : '0.3';
   buildForm(currentTool.inputSchema);
   updatePreview();
 }
 toolSelect.addEventListener('change', () => selectTool(toolSelect.value));
 
-// Formulier
+// ── Formulier ─────────────────────────────────────────────────────────────
 function buildForm(schema) {
   formFields.innerHTML = '';
   const props = schema?.properties ?? {};
@@ -283,7 +496,7 @@ function updatePreview() {
   renderJSON(reqPanel, { tool: currentTool.name, args: collectArgs() });
 }
 
-// Response renderen
+// ── Response renderen ─────────────────────────────────────────────────────
 function renderResponse(result, store = true) {
   if (store) lastResult = result;
   const isStr = typeof result === 'string';
@@ -293,13 +506,19 @@ function renderResponse(result, store = true) {
   respRaw.innerHTML = highlight(JSON.stringify(result, null, 2));
 }
 
-// Uitvoeren
+// ── Uitvoeren ─────────────────────────────────────────────────────────────
 runBtn.addEventListener('click', async () => {
   if (!currentTool) return;
   runBtn.disabled = true; runBtn.textContent = 'Bezig...';
   respFmt.innerHTML = '<span class="text-gray-600 text-xs">wachten...</span>';
   respRaw.textContent = 'wachten...';
   durBadge.classList.add('hidden');
+
+  // Mobiel: switch naar Respons-tab
+  if (isMobile()) {
+    const btn = document.querySelector('.mob-tab[data-target="resp"]');
+    if (btn) setMobTab(btn, 'resp');
+  }
 
   const payload = { tool: currentTool.name, args: collectArgs() };
   const t0 = Date.now();
@@ -325,7 +544,7 @@ runBtn.addEventListener('click', async () => {
   }
 });
 
-// SSE log
+// ── SSE log ───────────────────────────────────────────────────────────────
 function log(type, msg) {
   const colors = { system:'text-gray-600', request:'text-blue-400', response:'text-green-400', ping:'text-gray-700' };
   const ts = new Date().toLocaleTimeString('nl-NL', { hour12:false });
@@ -337,7 +556,60 @@ function log(type, msg) {
 }
 $('clear-btn').addEventListener('click', () => sseLog.innerHTML = '');
 
-// Helpers
+// ── Desktop resize handles ────────────────────────────────────────────────
+(function initResize() {
+  // Verticale handle: req/resp breedte aanpassen
+  let dragV = false, startX, startW;
+  handleV.addEventListener('pointerdown', e => {
+    if (isMobile()) return;
+    dragV = true; startX = e.clientX;
+    startW = reqPane.getBoundingClientRect().width;
+    handleV.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    handleV.setPointerCapture(e.pointerId);
+  });
+  handleV.addEventListener('pointermove', e => {
+    if (!dragV) return;
+    const totalW = panesRow.getBoundingClientRect().width - 4;
+    const newW = Math.max(80, Math.min(totalW - 80, startW + (e.clientX - startX)));
+    reqPane.style.flex = 'none';
+    reqPane.style.width = newW + 'px';
+    respPane.style.flex = '1';
+    respPane.style.width = '';
+  });
+  handleV.addEventListener('pointerup', () => {
+    dragV = false; handleV.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+
+  // Horizontale handle: stream hoogte aanpassen
+  let dragH = false, startY, startH;
+  handleH.addEventListener('pointerdown', e => {
+    if (isMobile()) return;
+    if (streamCollapsed) return;
+    dragH = true; startY = e.clientY;
+    startH = streamPane.getBoundingClientRect().height;
+    handleH.classList.add('active');
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    handleH.setPointerCapture(e.pointerId);
+  });
+  handleH.addEventListener('pointermove', e => {
+    if (!dragH) return;
+    const newH = Math.max(32, startH - (e.clientY - startY));
+    streamPane._savedH = newH;
+    streamPane.style.height = newH + 'px';
+  });
+  handleH.addEventListener('pointerup', () => {
+    dragH = false; handleH.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+// ── Helpers ───────────────────────────────────────────────────────────────
 function renderJSON(el, v) { el.innerHTML = highlight(JSON.stringify(v, null, 2)); }
 function highlight(s) {
   return esc(s).replace(
