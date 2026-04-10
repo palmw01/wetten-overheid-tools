@@ -175,7 +175,7 @@ Haalt één artikel op uit een regeling via BWB-id en artikelnummer. De response
 }
 ```
 
-`citeertitel` en `versiedatum` komen uit de `<citeertitel>` en het `inwerkingtreding`-attribuut in de BWB-toestand XML; bij ontbreken wordt de SRU-metadata gebruikt. `structuurpad` is een lege array `[]` als het artikel geen structuurancestors heeft. `leden` is een array van objecten `{ lid: string, tekst: string }` per genummerd lid; leeg `[]` als het artikel geen genummerde leden heeft. Als `lid` als parameter is opgegeven, bevat de response ook het veld `"lid": "<lidnummer>"`. `waarschuwing` bevat een tekst als het artikel de status `"vervallen"` heeft, anders `null`.
+`citeertitel` en `versiedatum` komen uit de `<citeertitel>` en het `inwerkingtreding`-attribuut in de BWB-toestand XML; bij ontbreken wordt de SRU-metadata gebruikt. `structuurpad` is een lege array `[]` als het artikel geen structuurancestors heeft. `leden` is een array van objecten `{ lid: string, tekst: string }`: één entry per genummerd lid, of bij artikelen zonder genummerde leden (bijv. Leidraad `<circulaire.divisie>` met `<tekst>`, of een gewone `<al>`) één entry met `lid: ""` en de volledige artikeltekst. Als `lid` als parameter is opgegeven, bevat de response ook het veld `"lid": "<lidnummer>"`. `waarschuwing` bevat een tekst als het artikel de status `"vervallen"` heeft, anders `null`.
 
 Niet-gevonden: `{ "citeertitel": "...", "versiedatum": "...", "bwbId": "...", "artikel": "999", "fout": "Artikel 999 niet gevonden in deze wet." }`
 
@@ -328,7 +328,7 @@ Zoekt de dichtstbijzijnde artikelkop **vóór** `matchIndex`. Regex: `/Artikel\s
 
 ### 5.5  `extraheerArtikelUitXml(rawXml, artikelnummer)`
 
-**Primaire** methode voor artikel-extractie. Retourneert `{ tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null`. `tekst` is de letterlijke artikeltekst (kop + leden aaneengesloten); `structuurpad` is de ancestor-keten als array van strings (bijv. `["Hoofdstuk II — ...", "Afdeling 1 — ..."]`); `leden` is een array per genummerd lid met `lid` (lidnummer als string) en `tekst` (de opgemaakte lidtekst). Gebruikt DOM-traversal via `fast-xml-parser`.
+**Primaire** methode voor artikel-extractie. Retourneert `{ tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null`. `tekst` is de letterlijke artikeltekst (kop + leden aaneengesloten); `structuurpad` is de ancestor-keten als array van strings (bijv. `["Hoofdstuk II — ...", "Afdeling 1 — ..."]`); `leden` is een array per genummerd lid met `lid` (lidnummer als string) en `tekst` (de opgemaakte lidtekst); bij artikelen zonder genummerde leden één entry met `lid: ""`. Gebruikt DOM-traversal via `fast-xml-parser`.
 
 **Zoekstrategie van `zoekArtikelInDom`:**
 
@@ -337,7 +337,7 @@ Per node (max. diepte 30):
   ├── [artikel]              → kop/nr vergelijken; recursief in kinderen zoeken
   ├── [circulaire.divisie]   → kop/nr vergelijken; recursief in kinderen zoeken
   └── [structurele containers: boek, deel, hoofdstuk, afdeling, paragraaf,
-       wettekst, wet-besluit, wetgeving, circulaire, tekst]
+       wettekst, wet-besluit, wetgeving, circulaire, circulaire-tekst, tekst]
         → recursief doorzoeken; hoofdstuk/afdeling toegevoegd aan ancestor-keten
 ```
 

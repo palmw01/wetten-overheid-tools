@@ -58,7 +58,7 @@ De server laadt geen XSD's op en valideert er niet mee, maar twee publieke schem
 
 **`BWB-toestand/2016-1` (`toestand_2016-1.xsd`)** — beschrijft de XML-structuur van wetsdocumenten die het repository serveert. Hierop is gebaseerd:
 - De `isArray`-lijst in `wetParser`: elementen met `maxOccurs="unbounded"` in de XSD (`artikel`, `lid`, `li`, `circulaire.divisie`, enz.) moeten als array worden geparsed, anders breekt de DOM-traversal bij enkelvoudige kinderen.
-- De structurele containers in `zoekArtikelInDom`: `boek`, `deel`, `hoofdstuk`, `afdeling`, `paragraaf`, `wettekst`, `wetgeving` zijn XSD-elementnamen.
+- De structurele containers in `zoekArtikelInDom`: `boek`, `deel`, `hoofdstuk`, `afdeling`, `paragraaf`, `wettekst`, `wetgeving`, `circulaire`, `circulaire-tekst` zijn XSD-elementnamen. Let op `circulaire-tekst`: de Leidraad heeft de structuur `circulaire → circulaire-tekst → circulaire.divisie[]`; zonder dit niveau werden alle Leidraad-artikelen niet gevonden.
 - De veldnamen in `formateerArtikelNode`: `kop`, `nr`, `al`, `lid`, `lidnr`, `lijst`, `li`, `tekst`.
 
 **`BWB-WTI/2016-1` (`wti_2016-1.xsd`)** — beschrijft de recordstructuur die de SRU-zoekdienst teruggeeft. De padnamen in `parseRecords()` zijn WTI-XSD-elementen en namespaces:
