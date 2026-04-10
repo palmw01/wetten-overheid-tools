@@ -537,7 +537,7 @@ function renderArtikel(r) {
 
   const ledenHtml = (r.leden ?? []).map(lid => `
     <div class="flex gap-3 py-2 border-b border-gray-800 last:border-0">
-      <div class="flex-shrink-0 w-10 text-right text-xs text-sky-500 font-mono pt-0.5">lid ${esc(lid.lid)}</div>
+      <div class="flex-shrink-0 w-10 text-right text-xs text-sky-500 font-mono pt-0.5">${lid.lid ? 'lid ' + esc(lid.lid) : ''}</div>
       <div class="text-sm text-gray-200 leading-relaxed md">${marked.parse(stripLidPrefix(lid.tekst))}</div>
     </div>`).join('');
 
