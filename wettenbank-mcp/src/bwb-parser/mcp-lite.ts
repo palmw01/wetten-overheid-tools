@@ -197,7 +197,9 @@ function renderNodeToMarkdown(node: NormalizedNode): string {
       return lijst.items
         .map((li: NormalizedListItem) => {
           let label = li.label.trim();
-          if (label && !label.endsWith(".") && !label.endsWith(")")) {
+          // Alleen een punt toevoegen als het een 'nummering' is (cijfer of letter)
+          // en nog geen afsluitend teken heeft. Symbolen zoals - of • krijgen geen punt.
+          if (label && /^[a-zA-Z0-9]+$/.test(label)) {
             label += ".";
           }
           const prefix = label ? `${label} ` : "* ";
@@ -206,7 +208,7 @@ function renderNodeToMarkdown(node: NormalizedNode): string {
             // Geneste lijst met indentatie
             const nested = li.items.map((sub: NormalizedListItem) => {
               let subLabel = sub.label.trim();
-              if (subLabel && !subLabel.endsWith(".") && !subLabel.endsWith(")")) {
+              if (subLabel && /^[a-zA-Z0-9]+$/.test(subLabel)) {
                 subLabel += ".";
               }
               const subPrefix = subLabel ? `${subLabel} ` : "* ";

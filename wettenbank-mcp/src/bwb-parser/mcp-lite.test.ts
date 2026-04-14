@@ -181,4 +181,30 @@ describe("MCP-Lite Transformation", () => {
     expect(result.mcpLite[0].sectie).toContain("Lid 1");
     expect(result.mcpLite[1].sectie).toContain("Lid 2");
   });
+
+  it("does not add trailing dots to dash list labels", () => {
+    const dashListXml = `<?xml version="1.0" encoding="UTF-8"?>
+<toestand bwb-id="BWBR12345">
+  <wetgeving>
+    <wettekst>
+      <artikel>
+        <kop><nr>1</nr></kop>
+        <lijst>
+          <li>
+            <li.nr>–</li.nr>
+            <al>Streepje item</al>
+          </li>
+        </lijst>
+      </artikel>
+    </wettekst>
+  </wetgeving>
+</toestand>`;
+
+    const result = parseBwb(dashListXml, "BWBR12345", "Test Wet");
+    const node = result.mcpLite[0];
+    
+    // Should contain "– Streepje item", NOT "–. Streepje item"
+    expect(node.tekst).toContain("– Streepje item");
+    expect(node.tekst).not.toContain("–. Streepje item");
+  });
 });
