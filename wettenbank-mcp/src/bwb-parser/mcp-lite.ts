@@ -16,8 +16,10 @@ import type {
   NormalizedLid,
   NormalizedListItem,
   NormalizedTable,
-  NormalizedTableRow,
   BwbMetadata,
+  NormalizedArtikel,
+  NormalizedLijst,
+  NormalizedLeaf,
 } from "./types.js";
 
 interface TransformContext {
@@ -59,7 +61,8 @@ function processNode(
     case "artikel":
     case "circulaire_divisie":
       // Artikelen zijn de primaire 'content-units'
-      for (const lid of node.leden) {
+      const art = node as NormalizedArtikel;
+      for (const lid of art.leden) {
         result.push(createMcpLiteNode(lid, nextContext));
       }
       break;
@@ -68,7 +71,6 @@ function processNode(
     case "table":
     case "al":
       // Losse elementen (buiten een artikel/lid context)
-      // Dit gebeurt zelden in BWB-toestanden maar we vangen het op.
       result.push(createMcpLiteNode(node, nextContext));
       break;
 
@@ -169,8 +171,9 @@ function renderContent(content: ContentItem[]): string {
 function renderNodeToMarkdown(node: NormalizedNode): string {
   switch (node.type) {
     case "lijst":
-      return node.items
-        .map((li) => {
+      const lijst = node as NormalizedLijst;
+      return lijst.items
+        .map((li: NormalizedListItem) => {
           let label = li.label.trim();
           if (label && !label.endsWith(".") && !label.endsWith(")")) {
             label += ".";
@@ -179,7 +182,7 @@ function renderNodeToMarkdown(node: NormalizedNode): string {
           let text = renderContent(li.content);
           if (li.items.length > 0) {
             // Geneste lijst met indentatie
-            const nested = li.items.map(sub => {
+            const nested = li.items.map((sub: NormalizedListItem) => {
               let subLabel = sub.label.trim();
               if (subLabel && !subLabel.endsWith(".") && !subLabel.endsWith(")")) {
                 subLabel += ".";
@@ -194,10 +197,10 @@ function renderNodeToMarkdown(node: NormalizedNode): string {
         .join("\n");
 
     case "table":
-      return renderTableToMarkdown(node);
+      return renderTableToMarkdown(node as NormalizedTable);
 
     case "al":
-      return renderContent(node.content);
+      return renderContent((node as NormalizedLeaf).content);
 
     default:
       return "";

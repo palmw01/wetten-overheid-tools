@@ -12,6 +12,7 @@
 
 import type {
   BwbNode,
+  BwbMetadata,
   ContentItem,
   NormalizedNode,
   NormalizedContainer,

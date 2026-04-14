@@ -20,8 +20,6 @@ import {
   ZoekOutputSchema,
   ZoektermOutputSchema,
   ArtikelOutputSchema,
-  StructuurInputSchema,
-  StructuurOutputSchema,
 } from "./shared/schemas.js";
 import { parseBwb } from "./bwb-parser/index.js";
 
