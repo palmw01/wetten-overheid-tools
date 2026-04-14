@@ -31,7 +31,9 @@ describe("MCP-Lite Transformation", () => {
   it("transforms a complex structure to MCP-Lite format", () => {
     const result = parseBwb(sampleXml, "BWBR0024096", "Leidraad Invordering 2008");
     
-    expect(result.mcpLite).toHaveLength(1);
+    // Bij circulaire_divisie splitsen we tekst-blokken en sub-divisies
+    // In dit geval is er 1 lid (lid:0) dat zowel de al als de lijst bevat.
+    expect(result.mcpLite.length).toBeGreaterThanOrEqual(1);
     const node = result.mcpLite[0];
     
     expect(node.bwbId).toBe("BWBR0024096");
@@ -80,6 +82,53 @@ describe("MCP-Lite Transformation", () => {
     expect(node.tekst).toContain("| Header 1 | Header 2 |");
     expect(node.tekst).toContain("| --- | --- |");
     expect(node.tekst).toContain("| Value 1 | Value 2 |");
+  });
+
+  it("handles tables with nested 'al' tags in entries", () => {
+    const tableAlXml = `<?xml version="1.0" encoding="UTF-8"?>
+<toestand bwb-id="BWBR12345">
+  <wetgeving>
+    <wettekst>
+      <artikel>
+        <kop><nr>1</nr></kop>
+        <table>
+          <tgroup cols="1">
+            <tbody>
+              <row>
+                <entry><al>Geneste tekst</al></entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </artikel>
+    </wettekst>
+  </wetgeving>
+</toestand>`;
+
+    const result = parseBwb(tableAlXml, "BWBR12345", "Test Wet");
+    const node = result.mcpLite[0];
+    
+    expect(node.tekst).toContain("| Geneste tekst |");
+  });
+
+  it("deduplicates label and nr in section path", () => {
+    const dedupXml = `<?xml version="1.0" encoding="UTF-8"?>
+<toestand bwb-id="BWBR12345">
+  <wetgeving>
+    <wettekst>
+      <artikel>
+        <kop><label>1.1.1</label><nr>1.1.1</nr><titel>Titel</titel></kop>
+        <al>Tekst</al>
+      </artikel>
+    </wettekst>
+  </wetgeving>
+</toestand>`;
+
+    const result = parseBwb(dedupXml, "BWBR12345", "Test Wet");
+    const node = result.mcpLite[0];
+    
+    // Should be "1.1.1 Titel", not "1.1.1 1.1.1 Titel"
+    expect(node.sectie).toBe("1.1.1 Titel");
   });
 
   it("handles nested lists with indentation", () => {

@@ -266,9 +266,21 @@ function parseContentNodes(el: DomElement, bwbId: string, path: string[]): Conte
       if (text.trim()) items.push(text);
     } else if (child.nodeType === 1) {
       const childEl = child as unknown as DomElement;
-      if (INLINE_TAGS.has(childEl.tagName)) {
+      const tag = childEl.tagName;
+
+      if (INLINE_TAGS.has(tag)) {
         const inline = parseInline(childEl, bwbId, path);
         if (inline) items.push(inline);
+      } else if (tag === "al") {
+         // Speciale case: al binnen mixed content (bijv. entry)
+         // We parsen dit als een volwaardige BwbNode maar voegen hem toe als inline item
+         const segment = [normalizeType(tag), String(items.length)];
+         const alNode = parseElement(childEl, bwbId, path, items.length);
+         items.push({
+           type: "al",
+           content: alNode.content || [],
+           label: alNode.metadata.label || undefined
+         });
       }
       // Niet-inline elementen in mixed content worden genegeerd op content-niveau
       // (ze zijn geen geldige BWB mixed-content kinderen)

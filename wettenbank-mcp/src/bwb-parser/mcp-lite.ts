@@ -53,7 +53,10 @@ function processNode(
   const nr = node.metadata.nr || node.metadata.lidnr || node.metadata.linr || "";
   const titel = node.metadata.titel || "";
   
-  const currentLevel = [label, nr, titel].filter(Boolean).join(" ");
+  // Ontdubbel label en nr (voorkom "1.1.1 1.1.1")
+  const labelPart = (label && label !== nr) ? label : "";
+  const currentLevel = [labelPart, nr, titel].filter(Boolean).join(" ");
+  
   const newPath = currentLevel ? [...context.path, currentLevel] : context.path;
   const nextContext = { ...context, path: newPath };
 
@@ -62,8 +65,13 @@ function processNode(
     case "circulaire_divisie":
       // Artikelen zijn de primaire 'content-units'
       const art = node as NormalizedArtikel;
-      for (const lid of art.leden) {
-        result.push(createMcpLiteNode(lid, nextContext));
+      if (art.leden.length > 0) {
+        for (const lid of art.leden) {
+          result.push(createMcpLiteNode(lid, nextContext));
+        }
+      } else {
+        // Artikel zonder leden maar met content/children
+        result.push(createMcpLiteNode(node, nextContext));
       }
       break;
 
@@ -96,7 +104,7 @@ function createMcpLiteNode(
   let tekstParts: string[] = [];
   
   // 1. Hoofdtekst (content-array naar Markdown)
-  if ("content" in node && node.content) {
+  if ("content" in node && node.content && node.content.length > 0) {
     tekstParts.push(renderContent(node.content));
   } else if ("tekst" in node && node.tekst) {
     tekstParts.push(node.tekst);
@@ -114,7 +122,10 @@ function createMcpLiteNode(
   if ("lidnr" in node && node.lidnr) {
     sectie += ` > Lid ${node.lidnr}`;
   } else if ("label" in node && node.label) {
-    sectie += ` > Item ${node.label}`;
+    // Check of dit een lijstitem is (heeft 'items' property)
+    if ("items" in node) {
+       sectie += ` > Item ${node.label}`;
+    }
   }
 
   // 4. Bronreferentie (JCI-uri)
@@ -153,6 +164,15 @@ function renderContent(content: ContentItem[]): string {
       if (item.type === "nadruk") {
         const inner = item.content ? renderContent(item.content) : (item.label || "");
         return `**${inner}**`;
+      }
+
+      // 'al' als inline container (gebeurt in tabelcellen)
+      if (item.type === "al") {
+        // BELANGRIJK: Gebruik item.content als die er is, anders item.label
+        if (item.content && item.content.length > 0) {
+          return renderContent(item.content);
+        }
+        return item.label || "";
       }
       
       // Fallback

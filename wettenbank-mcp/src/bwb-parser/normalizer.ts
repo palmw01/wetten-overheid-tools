@@ -106,18 +106,20 @@ function normalizeArtikel(node: BwbNode): NormalizedArtikel {
   const leden: NormalizedLid[] = [];
 
   if (node.type === "circulaire_divisie") {
-    // Leidraad-structuur: circulaire.divisie → kop, tekst, lijst, sub-divisies
+    // Leidraad-structuur: circulaire.divisie → kop, tekst?, lijst*, circulaire.divisie*
     const alNodes: BwbNode[] = [];
     const overige: BwbNode[] = [];
 
+    // Verzamel alles wat GEEN sub-divisie is als de 'hoofdcontent' van dit artikel
     for (const child of node.children) {
       if (child.type === "tekst") {
+        // Tekst blok bevat meestal de al-nodes
         alNodes.push(...child.children.filter(c => c.type === "al"));
         overige.push(...child.children.filter(c => c.type !== "al"));
       } else if (child.type === "al") {
         alNodes.push(child);
       } else if (child.type === "circulaire_divisie") {
-        // Sub-divisies worden later afgehandeld
+        // Sub-divisies worden later apart als 'leden' toegevoegd
       } else if (child.type !== "kop") {
         overige.push(child);
       }
@@ -130,11 +132,25 @@ function normalizeArtikel(node: BwbNode): NormalizedArtikel {
     // Sub-divisies als aparte leden (voor geneste divisies)
     const subDivisies = node.children.filter((c) => c.type === "circulaire_divisie");
     for (const sub of subDivisies) {
+      const subAl: BwbNode[] = [];
+      const subOverige: BwbNode[] = [];
+      
+      for (const c of sub.children) {
+        if (c.type === "tekst") {
+          subAl.push(...c.children.filter(gc => gc.type === "al"));
+          subOverige.push(...c.children.filter(gc => gc.type !== "al"));
+        } else if (c.type === "al") {
+          subAl.push(c);
+        } else if (c.type !== "kop" && c.type !== "circulaire_divisie") {
+          subOverige.push(c);
+        }
+      }
+      
       leden.push(buildLid(
         `${node.id}:sub:${sub.metadata.nr ?? leden.length}`,
         sub.metadata.nr ?? "",
-        sub.children.filter(c => c.type === "al" || c.type === "tekst").flatMap(c => c.type === "tekst" ? c.children.filter(gc => gc.type === "al") : [c]),
-        sub.children.filter(c => c.type !== "al" && c.type !== "tekst" && c.type !== "kop" && c.type !== "circulaire_divisie"),
+        subAl,
+        subOverige,
         sub.metadata,
       ));
     }
