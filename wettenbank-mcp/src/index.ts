@@ -982,11 +982,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   tekst: r.tekst
                 };
               });
-
-              // Als we maar 1 resultaat hebben zonder lid-nummer, noemen we het lid "0" (standaard)
-              if (finaleLeden.length === 1 && finaleLeden[0].lid === "") {
-                finaleLeden[0].lid = "0";
-              }
             }
           }
         }

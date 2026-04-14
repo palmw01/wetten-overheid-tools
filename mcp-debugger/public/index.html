@@ -559,11 +559,14 @@ function renderArtikel(r) {
     .map(s => `<span>${esc(s)}</span>`)
     .join('<span class="mx-1 text-gray-700">›</span>');
 
-  const ledenHtml = (r.leden ?? []).map(lid => `
+  const ledenHtml = (r.leden ?? []).map(lid => {
+    const toonLid = lid.lid && lid.lid !== "0";
+    return `
     <div class="flex gap-3 py-2 border-b border-gray-800 last:border-0">
-      <div class="flex-shrink-0 w-10 text-right text-xs text-sky-500 font-mono pt-0.5">${lid.lid ? 'lid ' + esc(lid.lid) : ''}</div>
-      <div class="text-sm text-gray-200 leading-relaxed md">${marked.parse(stripLidPrefix(lid.tekst))}</div>
-    </div>`).join('');
+      ${toonLid ? `<div class="flex-shrink-0 w-10 text-right text-xs text-sky-500 font-mono pt-0.5">lid ${esc(lid.lid)}</div>` : ''}
+      <div class="text-sm text-gray-200 leading-relaxed md ${!toonLid ? 'flex-1' : ''}">${marked.parse(stripLidPrefix(lid.tekst))}</div>
+    </div>`;
+  }).join('');
 
   const waarschuwing = r.waarschuwing
     ? `<div class="mt-3 px-3 py-2 rounded border border-amber-700 bg-amber-950 text-amber-300 text-xs">${esc(r.waarschuwing)}</div>`
