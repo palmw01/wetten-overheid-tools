@@ -12,7 +12,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { XMLParser } from "fast-xml-parser";
-import { fileURLToPath } from "node:url";
+import { DOMParser } from "@xmldom/xmldom";
+import { fileURLToPath } from "url";
+
 import {
   ZoekInputSchema,
   ZoektermInputSchema,
@@ -885,6 +887,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   ],
 }));
 
+/**
+ * Zoekt een artikel- of circulaire.divisie element in de @xmldom boom.
+ */
+function zoekElementInDom(el: any, artikelnummer: string): any | null {
+  const tag = el.tagName;
+  if (tag === "artikel" || tag === "circulaire.divisie") {
+    // Check kop > nr
+    for (let i = 0; i < el.childNodes.length; i++) {
+      const child = el.childNodes.item(i);
+      if (child.tagName === "kop") {
+        for (let j = 0; j < child.childNodes.length; j++) {
+          const gchild = child.childNodes.item(j);
+          if (gchild.tagName === "nr" && gchild.textContent?.trim() === artikelnummer) {
+            return el;
+          }
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const child = el.childNodes.item(i);
+    if (child.nodeType === 1) {
+      const found = zoekElementInDom(child, artikelnummer);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
@@ -958,12 +990,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         let finaleStructuurpad = structuurpad;
 
         if (rawXml) {
-          const { transformToMcpLite, normalizeNode } = await import("./bwb-parser/index.js");
-          const parseResult = parseBwb(rawXml, bwbId, wetNaam, versiedatum);
-          const artikelNode = zoekNodeInBoom(parseResult.raw, artikel);
-          if (artikelNode) {
-            const normalized = normalizeNode(artikelNode);
-            let results = transformToMcpLite(normalized, bwbId, wetNaam);
+          const { transformToMcpLite, normalizeNode, parseElement } = await import("./bwb-parser/index.js");
+          
+          const domParser = new DOMParser();
+          const doc = domParser.parseFromString(rawXml, "text/xml");
+          const root = doc.documentElement as any;
+          const artikelElement = zoekElementInDom(root, artikel);
+
+          if (artikelElement) {
+            // Gebruik bwb-id uit XML indien aanwezig
+            const actualBwbId = root.getAttribute("bwb-id") || bwbId;
+            
+            // Parseer ALLEEN dit element (en zijn kinderen) naar een BwbNode
+            const rawNode = parseElement(artikelElement, actualBwbId, []);
+            const normalized = normalizeNode(rawNode);
+            let results = transformToMcpLite(normalized, actualBwbId, wetNaam);
             
             // Filter op lid indien gevraagd
             if (lidnr) {

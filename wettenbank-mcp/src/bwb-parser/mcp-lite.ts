@@ -65,12 +65,13 @@ function processNode(
     case "circulaire_divisie":
       // Artikelen zijn de primaire 'content-units'
       const art = node as NormalizedArtikel;
-      if (art.leden.length > 0) {
+      if (art.leden && art.leden.length > 0) {
         for (const lid of art.leden) {
           result.push(createMcpLiteNode(lid, nextContext));
         }
       } else {
-        // Artikel zonder leden maar met content/children
+        // Artikel zonder leden: we maken één node van het artikel zelf
+        // createMcpLiteNode pakt automatisch alle 'children' mee.
         result.push(createMcpLiteNode(node, nextContext));
       }
       break;
@@ -111,8 +112,9 @@ function createMcpLiteNode(
   }
 
   // 2. Kinderen (lijsten, tabellen) naar Markdown flattenen
-  if ("children" in node && node.children) {
-    for (const child of node.children) {
+  const nodeWithChildren = node as any;
+  if (nodeWithChildren.children && Array.isArray(nodeWithChildren.children)) {
+    for (const child of nodeWithChildren.children) {
       tekstParts.push(renderNodeToMarkdown(child));
     }
   }
@@ -167,7 +169,7 @@ function renderContent(content: ContentItem[]): string {
       }
 
       // 'al' als inline container (gebeurt in tabelcellen)
-      if (item.type === "al") {
+      if (item.type === "al" || item.type === "al_groep") {
         // BELANGRIJK: Gebruik item.content als die er is, anders item.label
         if (item.content && item.content.length > 0) {
           return renderContent(item.content);
@@ -240,6 +242,8 @@ function renderTableToMarkdown(table: NormalizedTable): string {
 
     // Header rij
     const firstRow = allRows[0];
+    if (!firstRow || !firstRow.cells || firstRow.cells.length === 0) continue;
+
     rows.push(`| ${firstRow.cells.map(c => renderContent(c.content)).join(" | ")} |`);
     
     // Separator rij
