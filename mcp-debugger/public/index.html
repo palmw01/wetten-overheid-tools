@@ -545,6 +545,25 @@ function renderFormattedRequest(toolName, args) {
   </div>`;
 }
 
+// ── MCP-Lite: opgemaakt (Opgemaakt tab) ──────────────────────────────────
+function renderMcpLite(items) {
+  if (!Array.isArray(items)) return renderGeneric(items);
+  
+  return items.map(item => `
+    <div class="p-4 border-b border-gray-800 last:border-0 space-y-3">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="text-xs text-gray-600 mb-1 leading-relaxed">${esc(item.sectie || '')}</div>
+          <div class="text-sky-400 text-xs font-medium">${esc(item.citeertitel || '')}</div>
+        </div>
+        <div class="flex-shrink-0 text-xs text-gray-500 font-mono">${esc(item.bwbId || '')}</div>
+      </div>
+      <div class="text-sm text-gray-200 leading-relaxed md">${marked.parse(item.tekst || '')}</div>
+      <div class="text-xs text-gray-700 font-mono break-all">${esc(item.bronreferentie || '')}</div>
+    </div>
+  `).join('');
+}
+
 // ── Result formatters (Opgemaakt tab) ─────────────────────────────────────
 function stripLidPrefix(tekst) {
   return tekst.replace(/^\d+(?:\.\d+)?\s{1,4}/, '');
@@ -569,6 +588,15 @@ function renderArtikel(r) {
     ? `<div class="mt-3 px-3 py-2 rounded border border-amber-700 bg-amber-950 text-amber-300 text-xs">${esc(r.waarschuwing)}</div>`
     : '';
 
+  // Als mcpLite aanwezig is, toon dat onder het artikel
+  const mcpLiteHtml = r.mcpLite ? `
+    <div class="mt-4 pt-4 border-t border-gray-800">
+      <div class="text-[10px] text-gray-600 uppercase tracking-widest mb-2">MCP-Lite (LLM-geoptimaliseerd)</div>
+      <div class="bg-gray-900/50 rounded-lg border border-gray-800/50">
+        ${renderMcpLite(r.mcpLite)}
+      </div>
+    </div>` : '';
+
   return `
     <div class="p-4 space-y-3">
       <div class="flex items-start justify-between gap-4">
@@ -584,6 +612,7 @@ function renderArtikel(r) {
       <hr class="border-gray-800"/>
       <div class="text-xs text-gray-700 font-mono">${esc(r.bronreferentie ?? '')}</div>
       ${waarschuwing}
+      ${mcpLiteHtml}
     </div>`;
 }
 
@@ -643,119 +672,6 @@ function renderZoekterm(r) {
     </div>`;
 }
 
-// ── Structuur: opgemaakt (Opgemaakt tab) ──────────────────────────────────
-function renderStructuur(r) {
-  if (r.fout) return renderGeneric(r);
-  const norm = r.normalized;
-
-  // Header
-  const header = `
-    <div class="p-4 border-b border-gray-800 flex items-start justify-between">
-      <div>
-        <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
-        <div class="text-white text-xl font-bold mt-0.5 font-mono">${esc(r.bwbId ?? '')}</div>
-      </div>
-      <div class="text-xs text-gray-600 font-mono">${esc(r.versiedatum ?? '')}</div>
-    </div>`;
-
-  let body = '';
-  if (norm && (norm.type === 'artikel' || norm.type === 'circulaire_divisie')) {
-    // Gefilterd op één artikel: toon het volledig
-    body = renderNormArtikel(norm);
-  } else if (norm) {
-    // Volledig document: toon samenvatting
-    const children = norm.children || [];
-    const artCount = countArtikelen(r.raw);
-    body = `<div class="p-4 space-y-3">
-      <div class="flex gap-4 flex-wrap">
-        <div class="text-xs text-gray-500">type <span class="text-sky-400 ml-1">${esc(norm.type || '')}</span></div>
-        ${artCount > 0 ? `<div class="text-xs text-gray-500">artikelen <span class="text-amber-400 ml-1">${artCount}</span></div>` : ''}
-        <div class="text-xs text-gray-500">kinderen <span class="text-gray-300 ml-1">${children.length}</span></div>
-      </div>
-    </div>`;
-  }
-
-  return header + body;
-}
-
-function countArtikelen(node, count = 0) {
-  if (!node || typeof node !== 'object') return count;
-  if (node.type === 'artikel' || node.type === 'circulaire_divisie') count++;
-  for (const c of (node.children || [])) count = countArtikelen(c, count);
-  return count;
-}
-
-function renderNormArtikel(norm) {
-  const ledenHtml = (norm.leden ?? []).map(lid => `
-    <div class="flex gap-3 py-2 border-b border-gray-800 last:border-0">
-      <div class="flex-shrink-0 w-10 text-right text-xs text-sky-500 font-mono pt-0.5">${lid.lidnr ? 'lid ' + esc(lid.lidnr) : ''}</div>
-      <div class="flex-1 min-w-0">
-        <div class="text-sm text-gray-200 leading-relaxed">${renderContentItems(lid.content || [])}</div>
-        ${(lid.children || []).map(c => renderNormChild(c)).join('')}
-      </div>
-    </div>`).join('');
-
-  return `<div class="p-4 space-y-3">
-    <div>
-      ${norm.titel ? `<div class="text-gray-500 text-xs mb-0.5">${esc(norm.titel)}</div>` : ''}
-      <div class="text-white text-lg font-bold">Artikel ${esc(norm.nr || '')}</div>
-    </div>
-    <hr class="border-gray-800"/>
-    <div>${ledenHtml || '<div class="text-xs text-gray-600">Geen inhoud</div>'}</div>
-  </div>`;
-}
-
-function renderNormChild(node) {
-  if (!node) return '';
-  if (node.type === 'lijst') return renderNormLijst(node);
-  if (node.type === 'table') {
-    const g = (node.groups || [])[0];
-    if (!g) return '';
-    const rows = [...(g.head || []), ...(g.body || [])].slice(0, 6);
-    const tableRows = rows.map((row, i) => {
-      const cells = (row.cells || []).map(c =>
-        `<td class="border border-gray-800 px-2 py-1 text-xs text-gray-300">${esc(c.tekst || '')}</td>`
-      ).join('');
-      return `<tr ${i === 0 && g.head.length > 0 ? 'class="bg-gray-800"' : ''}>${cells}</tr>`;
-    }).join('');
-    return `<div class="mt-2 overflow-x-auto"><table class="boom-table">${tableRows}</table></div>`;
-  }
-  return '';
-}
-
-function renderNormLijst(lijst) {
-  const items = (lijst.items || []).map(item => `
-    <div class="flex gap-2 py-0.5 text-sm text-gray-300">
-      <span class="text-sky-500 font-mono flex-shrink-0 min-w-5">${esc(item.label)}</span>
-      <span class="leading-relaxed">${renderContentItems(item.content || [])}</span>
-    </div>`).join('');
-  return `<div class="ml-2 mt-1 border-l border-gray-800 pl-3 space-y-0.5">${items}</div>`;
-}
-
-// ── Inline content renderen ────────────────────────────────────────────────
-function renderContentItem(item) {
-  if (typeof item === 'string') return esc(item);
-  if (item.type === 'intref' || item.type === 'extref') {
-    const href = item.target ? esc(item.target) : '#';
-    return `<a class="text-cyan-400 hover:underline" href="${href}" title="${href}" target="_blank">${esc(item.label || item.target || item.type)}</a>`;
-  }
-  if (item.type === 'nadruk') {
-    const inner = (item.content || []).map(renderContentItem).join('');
-    return item.nadrukType === 'vet'
-      ? `<strong class="text-white font-semibold">${inner}</strong>`
-      : `<em class="text-gray-300">${inner}</em>`;
-  }
-  if (item.type === 'sup') return `<sup class="text-xs">${(item.content||[]).map(renderContentItem).join('')}</sup>`;
-  if (item.type === 'sub') return `<sub class="text-xs">${(item.content||[]).map(renderContentItem).join('')}</sub>`;
-  if (item.type === 'br') return '<br>';
-  const inner = (item.content || []).map(renderContentItem).join('');
-  return `<span class="text-gray-500">[${esc(item.type)}${inner ? ':' + inner : ''}]</span>`;
-}
-
-function renderContentItems(items) {
-  return (items || []).map(renderContentItem).join('');
-}
-
 // ── Generic fallback ──────────────────────────────────────────────────────
 function renderGeneric(r) {
   if (r && typeof r === 'object' && r.fout) {
@@ -776,10 +692,8 @@ function formatResult(result) {
   if (typeof result === 'string') return marked.parse(result);
   if (typeof result !== 'object') return `<pre class="p-4 text-xs text-gray-300">${esc(String(result))}</pre>`;
   if (result.fout) return renderGeneric(result);
-  // Structuurboom (wettenbank_structuur)
-  if (result.raw !== undefined && result.normalized !== undefined) return renderStructuur(result);
   // Artikel
-  if (result.citeertitel && result.leden !== undefined) return renderArtikel(result);
+  if (result.citeertitel && (result.leden !== undefined || result.mcpLite !== undefined)) return renderArtikel(result);
   // Zoekterm
   if (result.zoekterm !== undefined && result.artikelen !== undefined) return renderZoekterm(result);
   // Zoek
@@ -805,7 +719,6 @@ runBtn.addEventListener('click', async () => {
   runBtn.disabled = true; runBtn.textContent = 'Bezig...';
   respFmt.innerHTML = '<span class="text-gray-600 text-xs">wachten...</span>';
   respRaw.textContent = 'wachten...';
-  respTree.innerHTML = '<div class="text-gray-700 text-xs p-4">Wachten op response...</div>';
   durBadge.classList.add('hidden');
 
   if (isMobile()) {
@@ -823,7 +736,6 @@ runBtn.addEventListener('click', async () => {
       const msg = typeof data.error === 'string' ? data.error : (data.error.message ?? JSON.stringify(data.error));
       respFmt.innerHTML = `<div class="text-red-400 text-xs p-4">Fout: ${esc(msg)}</div>`;
       respRaw.textContent = JSON.stringify(data.error, null, 2);
-      respTree.innerHTML = `<div class="text-red-400 text-xs p-4">Fout: ${esc(msg)}</div>`;
       durBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-900 text-red-400';
     } else {
       renderResponse(data.result);

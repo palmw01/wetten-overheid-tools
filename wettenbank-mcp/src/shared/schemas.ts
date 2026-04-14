@@ -92,6 +92,7 @@ export const ArtikelOutputSchema = z.object({
   lid: z.string().optional(), // alleen aanwezig als lid-filter gebruikt werd
   structuurpad: z.array(z.string()),
   leden: z.array(z.object({ lid: z.string(), tekst: z.string() })),
+  mcpLite: z.array(z.unknown()).optional(), // MCP-Lite format (token-efficiënt voor LLM)
   bronreferentie: z.string(),
   waarschuwing: z.string().nullable(),
 });
@@ -100,39 +101,6 @@ export const ArtikelOutputSchema = z.object({
 export const FoutOutputSchema = z.object({
   fout: z.string(),
 });
-
-// ── wettenbank_structuur ──────────────────────────────────────────────────────
-
-export const StructuurInputSchema = z.object({
-  bwbId: z.string().min(1, "bwbId mag niet leeg zijn"),
-  peildatum: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "peildatum moet YYYY-MM-DD zijn")
-    .default(vandaag),
-  /**
-   * Optioneel: artikelnummer om alleen de structuur van één artikel terug te geven.
-   * Zonder dit veld wordt de volledige documentstructuur geretourneerd.
-   */
-  artikel: z.string().optional(),
-});
-
-/**
- * BwbNode en NormalizedNode zijn recursief; Zod ondersteunt dat via z.lazy().
- * Voor MCP-output is z.unknown() voldoende: de consumer valideert de structuur
- * zelf via de TypeScript-types in bwb-parser/types.ts.
- */
-export const StructuurOutputSchema = z.object({
-  bwbId: z.string(),
-  citeertitel: z.string(),
-  versiedatum: z.string(),
-  /** RAW: verliesvrije representatie dicht op de XML-structuur. */
-  raw: z.unknown(),
-  /** NORMALIZED: vereenvoudigd voor LLM-gebruik en zoekbaarheid. */
-  normalized: z.unknown(),
-});
-
-export type StructuurInput = z.infer<typeof StructuurInputSchema>;
-export type StructuurOutput = z.infer<typeof StructuurOutputSchema>;
 
 // Inferred TypeScript-typen
 export type ZoekInput = z.infer<typeof ZoekInputSchema>;

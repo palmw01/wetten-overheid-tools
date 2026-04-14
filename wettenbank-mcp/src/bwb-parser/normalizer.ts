@@ -105,19 +105,36 @@ function normalizeArtikel(node: BwbNode): NormalizedArtikel {
   const leden: NormalizedLid[] = [];
 
   if (node.type === "circulaire_divisie") {
-    // Leidraad-structuur: circulaire.divisie → tekst → al[]
-    const tekstNode = node.children.find((c) => c.type === "tekst");
-    if (tekstNode) {
-      leden.push(buildLid(`${node.id}:lid:0`, "", tekstNode.children, []));
+    // Leidraad-structuur: circulaire.divisie → kop, tekst, lijst, sub-divisies
+    const alNodes: BwbNode[] = [];
+    const overige: BwbNode[] = [];
+
+    for (const child of node.children) {
+      if (child.type === "tekst") {
+        alNodes.push(...child.children.filter(c => c.type === "al"));
+        overige.push(...child.children.filter(c => c.type !== "al"));
+      } else if (child.type === "al") {
+        alNodes.push(child);
+      } else if (child.type === "circulaire_divisie") {
+        // Sub-divisies worden later afgehandeld
+      } else if (child.type !== "kop") {
+        overige.push(child);
+      }
     }
+
+    if (alNodes.length > 0 || overige.length > 0) {
+      leden.push(buildLid(`${node.id}:lid:0`, "", alNodes, overige, node.metadata));
+    }
+
     // Sub-divisies als aparte leden (voor geneste divisies)
     const subDivisies = node.children.filter((c) => c.type === "circulaire_divisie");
     for (const sub of subDivisies) {
       leden.push(buildLid(
         `${node.id}:sub:${sub.metadata.nr ?? leden.length}`,
         sub.metadata.nr ?? "",
-        sub.children,
-        [],
+        sub.children.filter(c => c.type === "al" || c.type === "tekst").flatMap(c => c.type === "tekst" ? c.children.filter(gc => gc.type === "al") : [c]),
+        sub.children.filter(c => c.type !== "al" && c.type !== "tekst" && c.type !== "kop" && c.type !== "circulaire_divisie"),
+        sub.metadata,
       ));
     }
   } else {
@@ -129,14 +146,14 @@ function normalizeArtikel(node: BwbNode): NormalizedArtikel {
         const lidnr = lid.metadata.lidnr ?? "";
         const alNodes = lid.children.filter((c) => c.type === "al");
         const overige = lid.children.filter((c) => c.type !== "al");
-        leden.push(buildLid(lid.id, lidnr, alNodes, overige));
+        leden.push(buildLid(lid.id, lidnr, alNodes, overige, lid.metadata));
       }
     } else {
       // Artikel zonder genummerde leden: directe al-nodes
       const alNodes = node.children.filter((c) => c.type === "al");
       const overige = node.children.filter((c) => c.type !== "al");
       if (alNodes.length > 0 || overige.length > 0) {
-        leden.push(buildLid(`${node.id}:lid:0`, "", alNodes, overige));
+        leden.push(buildLid(`${node.id}:lid:0`, "", alNodes, overige, node.metadata));
       }
     }
   }
@@ -159,6 +176,7 @@ function buildLid(
   lidnr: string,
   alNodes: BwbNode[],
   overigeChildren: BwbNode[],
+  metadata: BwbMetadata,
 ): NormalizedLid {
   // Concateneer alle content van de al-nodes
   const content: ContentItem[] = alNodes.flatMap((al) => al.content ?? []);
@@ -167,7 +185,7 @@ function buildLid(
   // Overige kinderen (lijst, tabel, sub-structuren) recursief normaliseren
   const children: NormalizedNode[] = overigeChildren.map(normalizeNode);
 
-  return { id, lidnr, tekst, content, children };
+  return { id, lidnr, tekst, content, children, metadata };
 }
 
 // ── Lijst ─────────────────────────────────────────────────────────────────────
@@ -196,7 +214,7 @@ function normalizeLi(li: BwbNode): NormalizedListItem {
     .filter((c) => c.type === "lijst")
     .flatMap((l) => normalizeLijst(l).items);
 
-  return { id: li.id, label, tekst, content, items };
+  return { id: li.id, label, tekst, content, items, metadata: li.metadata };
 }
 
 // ── CALS Tabel ────────────────────────────────────────────────────────────────

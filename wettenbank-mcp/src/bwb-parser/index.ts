@@ -12,6 +12,7 @@
 
 export { parseBwbXml, parseElement } from "./parser.js";
 export { normalizeNode, extractPlainText } from "./normalizer.js";
+export { transformToMcpLite } from "./mcp-lite.js";
 export type {
   BwbNode,
   BwbMetadata,
@@ -30,14 +31,16 @@ export type {
   NormalizedTableRow,
   NormalizedTableCell,
   NormalizedLeaf,
+  McpLiteNode,
 } from "./types.js";
 
 import { parseBwbXml } from "./parser.js";
 import { normalizeNode } from "./normalizer.js";
+import { transformToMcpLite } from "./mcp-lite.js";
 import type { ParseResult } from "./types.js";
 
 /**
- * Hoofdentry: parseert BWB-toestand XML naar RAW + NORMALIZED.
+ * Hoofdentry: parseert BWB-toestand XML naar RAW + NORMALIZED + MCP-LITE.
  *
  * @param xml         - volledige BWB-toestand XML
  * @param bwbId       - BWB-id als fallback (wordt overschreven door @bwb-id in XML)
@@ -52,11 +55,16 @@ export function parseBwb(
 ): ParseResult {
   const raw = parseBwbXml(xml, bwbId);
   const normalized = normalizeNode(raw);
+  
+  const finalBwbId = raw.metadata.bwbId ?? bwbId;
+  const mcpLite = transformToMcpLite(normalized, finalBwbId, citeertitel);
+
   return {
-    bwbId: raw.metadata.bwbId ?? bwbId,
+    bwbId: finalBwbId,
     citeertitel,
     versiedatum,
     raw,
     normalized,
+    mcpLite,
   };
 }

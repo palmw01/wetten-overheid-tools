@@ -884,29 +884,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
-    {
-      name: "wettenbank_structuur",
-      description:
-        "Retourneert de volledige gestructureerde JSON-representatie van een Nederlandse wet (BWB-toestand XML → BwbNode-boom). " +
-        "Geeft zowel RAW (verliesvrij, dicht op XML) als NORMALIZED (vereenvoudigd voor LLM-gebruik) output. " +
-        "Nuttig voor RAG-systemen, embeddings en juridische analyse. " +
-        "Optioneel: geef 'artikel' op om alleen de structuur van één artikel te retourneren. " +
-        "Kernwet-ids: IW 1990 → BWBR0004770 | AWR → BWBR0002320 | Awb → BWBR0005537 | Leidraad 2008 → BWBR0024096.",
-      inputSchema: {
-        type: "object",
-        required: ["bwbId"],
-        properties: {
-          bwbId: { type: "string", description: "BWB-id, bijv. BWBR0004770 (IW 1990)" },
-          peildatum: { type: "string", description: "Datum YYYY-MM-DD voor historische versie; default is vandaag." },
-          artikel: {
-            type: "string",
-            description:
-              "Optioneel artikelnummer (bijv. '9', '3:40'). " +
-              "Zonder dit veld wordt de volledige documentstructuur geretourneerd.",
-          },
-        },
-      },
-    },
   ],
 }));
 
@@ -976,6 +953,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       if (artikelTekst) {
         const statusWaarschuwing = detecteerArtikelStatus(rawXml, artikel);
+
+        // Genereer MCP-Lite output voor LLM
+        let mcpLite: unknown[] | undefined = undefined;
+        if (rawXml) {
+          const { transformToMcpLite, normalizeNode } = await import("./bwb-parser/index.js");
+          const parseResult = parseBwb(rawXml, bwbId, wetNaam, versiedatum);
+          const artikelNode = zoekNodeInBoom(parseResult.raw, artikel);
+          if (artikelNode) {
+            const normalized = normalizeNode(artikelNode);
+            let results = transformToMcpLite(normalized, bwbId, wetNaam);
+            
+            // Filter op lid indien gevraagd
+            if (lidnr) {
+              results = results.filter(n => n.sectie.endsWith(` > Lid ${lidnr}`));
+            }
+            mcpLite = results;
+          }
+        }
+
         const artikelResult = {
           citeertitel: wetNaam,
           versiedatum,
@@ -984,6 +980,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ...(lidnr !== null && { lid: lidnr }),
           structuurpad,
           leden,
+          mcpLite,
           bronreferentie: jci,
           waarschuwing: statusWaarschuwing ?? null,
         };
@@ -1055,73 +1052,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const parsedOutput = ZoektermOutputSchema.safeParse(result);
       if (!parsedOutput.success) {
         console.error("wettenbank_zoekterm output validatiefout:", parsedOutput.error);
-        return { content: [{ type: "text", text: JSON.stringify({ fout: "Onverwacht outputformaat" }) }] };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(parsedOutput.data) }] };
-    }
-
-    if (name === "wettenbank_structuur") {
-      const parsedInput = StructuurInputSchema.safeParse(args);
-      if (!parsedInput.success) {
-        return { content: [{ type: "text", text: JSON.stringify({ fout: parsedInput.error.issues[0].message }) }] };
-      }
-      const { bwbId, peildatum, artikel } = parsedInput.data;
-      const { rawXml, regeling } = await haalWetstekstOp(bwbId, peildatum);
-
-      // Haal citeertitel + versiedatum op uit DOM
-      let wetNaam = regeling.titel;
-      let versiedatum = regeling.geldigVanaf;
-      if (rawXml) {
-        const docDom = wetParser.parse(rawXml) as Record<string, unknown>;
-        const meta = extraheerDocMetadata(docDom);
-        if (meta.citeertitel) wetNaam = meta.citeertitel;
-        if (meta.versiedatum) versiedatum = meta.versiedatum;
-      }
-
-      if (!rawXml) {
-        return { content: [{ type: "text", text: JSON.stringify({ fout: "Wetstekst niet beschikbaar" }) }] };
-      }
-
-      // Parseer de volledige documentstructuur
-      const parseResult = parseBwb(rawXml, bwbId, wetNaam, versiedatum);
-
-      // Optioneel: filter op één artikel
-      let raw: unknown = parseResult.raw;
-      let normalized: unknown = parseResult.normalized;
-
-      if (artikel) {
-        // Zoek het artikel-node in de RAW-boom
-        const artikelRaw = zoekNodeInBoom(parseResult.raw, artikel);
-        if (!artikelRaw) {
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify({
-                bwbId,
-                citeertitel: wetNaam,
-                versiedatum,
-                fout: `Artikel ${artikel} niet gevonden in de structuurboom.`,
-              }),
-            }],
-          };
-        }
-        // Normaliseer alleen het gevonden artikel
-        const { normalizeNode } = await import("./bwb-parser/index.js");
-        raw = artikelRaw;
-        normalized = normalizeNode(artikelRaw);
-      }
-
-      const result = {
-        bwbId: parseResult.bwbId,
-        citeertitel: parseResult.citeertitel,
-        versiedatum: parseResult.versiedatum,
-        raw,
-        normalized,
-      };
-
-      const parsedOutput = StructuurOutputSchema.safeParse(result);
-      if (!parsedOutput.success) {
-        console.error("wettenbank_structuur output validatiefout:", parsedOutput.error);
         return { content: [{ type: "text", text: JSON.stringify({ fout: "Onverwacht outputformaat" }) }] };
       }
       return { content: [{ type: "text", text: JSON.stringify(parsedOutput.data) }] };

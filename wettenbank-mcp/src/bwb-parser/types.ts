@@ -114,6 +114,7 @@ export interface NormalizedArtikel {
 
 export interface NormalizedLid {
   id: string;
+  metadata: BwbMetadata;
   lidnr: string;          // "" voor artikelen zonder genummerde leden
   tekst: string;          // platte tekst (concatenatie van al-nodes)
   content: ContentItem[]; // gestructureerde content van de al-nodes
@@ -130,6 +131,7 @@ export interface NormalizedLijst {
 
 export interface NormalizedListItem {
   id: string;
+  metadata: BwbMetadata;
   label: string;          // inhoud van <li.nr>
   tekst: string;          // platte tekst van de <al>-nodes
   content: ContentItem[]; // gestructureerde content
@@ -172,6 +174,20 @@ export interface NormalizedTableCell {
   align?: string;
 }
 
+// ── MCP-LITE laag ────────────────────────────────────────────────────────────
+//
+// MCP-LITE transformeert complexe juridische structuren naar een token-efficiënt,
+// Markdown-georiënteerd JSON-formaat voor LLM-gebruik.
+
+export interface McpLiteNode {
+  bwbId: string;
+  citeertitel: string;
+  sectie: string;          // bijv. "Hoofdstuk 1 > Artikel 1" of "Paragraaf 1.1.2 Definities"
+  tekst: string;           // platte tekst met Markdown links, lijsten en tabellen
+  bronreferentie: string;  // JCI-uri of stabiele BWB-link voor navigatie
+  metadata?: Partial<BwbMetadata>; // optionele basis-metadata (status, etc.)
+}
+
 /** Eindresultaat van parseBwb() */
 export interface ParseResult {
   bwbId: string;
@@ -179,4 +195,5 @@ export interface ParseResult {
   versiedatum: string;
   raw: BwbNode;
   normalized: NormalizedNode;
+  mcpLite: McpLiteNode[]; // Lijst van content-units voor het LLM
 }
