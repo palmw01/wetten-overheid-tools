@@ -128,6 +128,27 @@
         border-top-color: #3b82f6;
       }
     }
+
+    /* ── BwbNode structuurboom ───────────────────────────────────────── */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    .tree-arrow { display: inline-block; transition: transform 0.12s; }
+    details:not([open]) > summary .tree-arrow { transform: rotate(-90deg); }
+    .tree-node > summary:hover,
+    .tree-leaf:hover { background: #0f172a; border-radius: 4px; }
+    .tree-body { border-left: 1px solid #1e293b; margin-left: 14px; }
+    .tree-id { opacity: 0; transition: opacity .15s; }
+    .tree-node > summary:hover .tree-id,
+    .tree-leaf:hover .tree-id { opacity: 1; }
+    /* Boom-tabel */
+    .boom-table { border-collapse: collapse; font-size: .72rem; }
+    .boom-table th { background: #1e293b; color: #7dd3fc; padding: .25rem .5rem; border: 1px solid #334155; text-align: left; }
+    .boom-table td { border: 1px solid #1e293b; padding: .2rem .5rem; color: #cbd5e1; }
+    /* Toggle buttons */
+    .boom-view-btn { font-size:.7rem; padding:.2rem .6rem; border-radius:4px; cursor:pointer; border:none; font-family:inherit; }
+    .boom-view-on  { background:#1d4ed8; color:#fff; }
+    .boom-view-off { background:#1e293b; color:#64748b; }
+    .boom-view-off:hover { color:#94a3b8; }
   </style>
 </head>
 
@@ -137,7 +158,7 @@
 <header class="flex-none flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
   <div class="flex items-center gap-2">
     <span class="font-bold text-white tracking-tight text-sm">MCP Debugger</span>
-    <span class="text-xs text-gray-600">v1.1</span>
+    <span class="text-xs text-gray-600">v1.2</span>
   </div>
   <div class="flex items-center gap-2">
     <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-600 inline-block"></span>
@@ -153,7 +174,6 @@
       class="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
       <option value="">— laden —</option>
     </select>
-    <!-- Info toggle: toelichting in/uitklappen -->
     <button id="info-btn"
       title="Toelichting tonen/verbergen"
       class="flex-none w-7 h-7 flex items-center justify-center rounded border text-xs transition-colors bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500">
@@ -165,7 +185,6 @@
     </button>
   </div>
 
-  <!-- Description: verborgen tot ⓘ geklikt wordt -->
   <p id="tool-description" class="hidden text-xs text-gray-500 italic leading-relaxed border-l-2 border-gray-700 pl-2"></p>
 
   <div id="form-container" class="hidden">
@@ -188,10 +207,19 @@
 
     <!-- Request -->
     <div id="req-pane" class="border-r border-gray-800">
-      <div class="flex-none px-4 py-1.5 bg-gray-900 border-b border-gray-800">
-        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Request</span>
+      <!-- Request pane tabs -->
+      <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center">
+        <button id="req-tab-btn-formatted" class="tab-on text-xs py-1.5 mr-4 transition-colors"
+          onclick="switchReqTab('formatted')">Opgemaakt</button>
+        <button id="req-tab-btn-json" class="tab-off text-xs py-1.5 transition-colors"
+          onclick="switchReqTab('json')">JSON</button>
       </div>
-      <pre id="request-panel" class="flex-1 overflow-auto p-3 text-xs text-gray-500 bg-gray-950">— nog geen aanvraag —</pre>
+      <!-- Opgemaakte request -->
+      <div id="request-formatted" class="flex-1 overflow-auto text-sm bg-gray-950 md leading-relaxed">
+        <div class="p-4 text-xs text-gray-600">— nog geen aanvraag —</div>
+      </div>
+      <!-- Ruwe JSON request -->
+      <pre id="request-panel" class="hidden flex-1 overflow-auto p-3 text-xs text-gray-500 bg-gray-950">— nog geen aanvraag —</pre>
     </div>
 
     <!-- Verticale resize handle (desktop) -->
@@ -203,13 +231,18 @@
         <div class="flex gap-4">
           <button id="tab-btn-formatted" class="tab-on text-xs py-1.5 transition-colors" onclick="switchTab('formatted')">Opgemaakt</button>
           <button id="tab-btn-raw"       class="tab-off text-xs py-1.5 transition-colors" onclick="switchTab('raw')">JSON</button>
+          <button id="tab-btn-tree"      class="tab-off text-xs py-1.5 transition-colors" onclick="switchTab('tree')">Boom</button>
         </div>
         <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
       </div>
+      <!-- Opgemaakt tab -->
       <div id="response-formatted" class="flex-1 overflow-auto p-3 text-sm bg-gray-950 md leading-relaxed">
         <span class="text-gray-600 text-xs">— nog geen response —</span>
       </div>
+      <!-- JSON tab -->
       <pre id="response-raw" class="hidden flex-1 overflow-auto p-3 text-xs text-gray-300 bg-gray-950">— nog geen response —</pre>
+      <!-- Boom tab -->
+      <div id="response-tree" class="hidden flex-1 overflow-auto p-2 bg-gray-950"></div>
     </div>
 
   </div>
@@ -222,7 +255,6 @@
     <div class="flex-none px-4 py-1 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Stream</span>
-        <!-- Collapse knop (desktop) -->
         <button id="stream-collapse-btn"
           title="Minimaliseren/uitklappen"
           class="hidden md:flex items-center justify-center w-4 h-4 text-gray-600 hover:text-gray-400 text-xs"
@@ -246,6 +278,8 @@
 marked.setOptions({ breaks: true, gfm: true });
 
 let currentTool = null, tools = [], currentTab = 'formatted', lastResult = null;
+let currentReqTab = 'formatted';
+let lastRequestData = null; // { tool, args }
 const isMobile = () => window.innerWidth < 768;
 
 const $ = id => document.getElementById(id);
@@ -256,9 +290,11 @@ const runBtn        = $('run-btn');
 const formContainer = $('form-container');
 const formFields    = $('form-fields');
 const toolDesc      = $('tool-description');
+const reqFmt        = $('request-formatted');
 const reqPanel      = $('request-panel');
 const respFmt       = $('response-formatted');
 const respRaw       = $('response-raw');
+const respTree      = $('response-tree');
 const durBadge      = $('duration-badge');
 const sseLog        = $('sse-log');
 const reqPane       = $('req-pane');
@@ -281,7 +317,6 @@ function setMobTab(btn, target) {
 function applyMobileLayout() {
   if (!isMobile()) return;
 
-  // Reset inline flex/display for mobile
   panesRow.style.flex = '';
   reqPane.style.flex = '';
   respPane.style.flex = '';
@@ -316,52 +351,40 @@ function resetDesktopLayout() {
   [panesRow, reqPane, respPane, streamPane, handleH, handleV].forEach(el => {
     el.style.cssText = '';
   });
-  // Restore stream default height
   streamPane.style.height = streamCollapsed ? '' : '7rem';
 }
 
 window.addEventListener('resize', () => {
-  if (isMobile()) {
-    applyMobileLayout();
-  } else {
-    resetDesktopLayout();
-  }
+  if (isMobile()) applyMobileLayout();
+  else resetDesktopLayout();
 });
 
-// Initieel
 if (isMobile()) applyMobileLayout();
 
 // ── Info / description toggle ─────────────────────────────────────────────
 $('info-btn').addEventListener('click', () => {
   const nowHidden = toolDesc.classList.toggle('hidden');
   const btn = $('info-btn');
-  if (nowHidden) {
-    btn.style.color = '';
-    btn.style.borderColor = '';
-  } else {
-    btn.style.color = '#38bdf8';
-    btn.style.borderColor = '#38bdf8';
-  }
+  if (nowHidden) { btn.style.color = ''; btn.style.borderColor = ''; }
+  else { btn.style.color = '#38bdf8'; btn.style.borderColor = '#38bdf8'; }
 });
 
 // ── Stream collapse (desktop) ─────────────────────────────────────────────
 let streamCollapsed = false;
-const STREAM_DEFAULT_H = 112; // 7rem
+const STREAM_DEFAULT_H = 112;
 
 function toggleStream() {
   streamCollapsed = !streamCollapsed;
-  const log = $('sse-log');
+  const logEl = $('sse-log');
   const btn = $('stream-collapse-btn');
   if (streamCollapsed) {
-    log.style.display = 'none';
+    logEl.style.display = 'none';
     streamPane.style.height = '';
-    btn.textContent = '▸';
-    btn.title = 'Uitklappen';
+    btn.textContent = '▸'; btn.title = 'Uitklappen';
   } else {
-    log.style.display = '';
+    logEl.style.display = '';
     streamPane.style.height = streamPane._savedH ? streamPane._savedH + 'px' : STREAM_DEFAULT_H + 'px';
-    btn.textContent = '▾';
-    btn.title = 'Minimaliseren';
+    btn.textContent = '▾'; btn.title = 'Minimaliseren';
   }
 }
 
@@ -371,24 +394,28 @@ function toggleForm() {
   formCollapsed = !formCollapsed;
   const btn = $('form-collapse-btn');
   const fields = $('form-fields');
-  if (formCollapsed) {
-    fields.style.display = 'none';
-    btn.textContent = '▸';
-    btn.title = 'Invoervelden uitklappen';
-  } else {
-    fields.style.display = '';
-    btn.textContent = '▾';
-    btn.title = 'Invoervelden inklappen';
-  }
+  if (formCollapsed) { fields.style.display = 'none'; btn.textContent = '▸'; btn.title = 'Invoervelden uitklappen'; }
+  else { fields.style.display = ''; btn.textContent = '▾'; btn.title = 'Invoervelden inklappen'; }
+}
+
+// ── Request pane tabs ─────────────────────────────────────────────────────
+function switchReqTab(tab) {
+  currentReqTab = tab;
+  $('req-tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 mr-4 transition-colors';
+  $('req-tab-btn-json').className       = (tab==='json'?'tab-on':'tab-off')      + ' text-xs py-1.5 transition-colors';
+  reqFmt.classList.toggle('hidden', tab !== 'formatted');
+  reqPanel.classList.toggle('hidden', tab !== 'json');
 }
 
 // ── Response tabs ─────────────────────────────────────────────────────────
 function switchTab(tab) {
   currentTab = tab;
-  $('tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
-  $('tab-btn-raw').className       = (tab==='raw'?'tab-on':'tab-off')       + ' text-xs py-1.5 transition-colors';
+  ['formatted','raw','tree'].forEach(t => {
+    $(`tab-btn-${t}`).className = (tab===t?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
+  });
   respFmt.classList.toggle('hidden', tab !== 'formatted');
   respRaw.classList.toggle('hidden', tab !== 'raw');
+  respTree.classList.toggle('hidden', tab !== 'tree');
   if (lastResult !== null) renderResponse(lastResult, false);
 }
 
@@ -431,7 +458,6 @@ function selectTool(name) {
   currentTool = tools.find(t => t.name === name) ?? null;
   if (!currentTool) return;
   toolDesc.textContent = currentTool.description ?? '';
-  // Verberg description bij het wisselen van tool; gebruiker opent zelf
   if (!toolDesc.classList.contains('hidden')) {
     toolDesc.classList.add('hidden');
     $('info-btn').style.color = '';
@@ -518,7 +544,30 @@ function collectArgs() {
 
 function updatePreview() {
   if (!currentTool) return;
-  renderJSON(reqPanel, { tool: currentTool.name, args: collectArgs() });
+  const args = collectArgs();
+  lastRequestData = { tool: currentTool.name, args };
+  // JSON tab
+  renderJSON(reqPanel, { tool: currentTool.name, args });
+  // Opgemaakt tab
+  reqFmt.innerHTML = renderFormattedRequest(currentTool.name, args);
+}
+
+// ── Opgemaakte request ────────────────────────────────────────────────────
+function renderFormattedRequest(toolName, args) {
+  const entries = Object.entries(args).filter(([,v]) => v !== '' && v !== null && v !== undefined);
+  const rows = entries.map(([k, v]) => `
+    <div class="flex gap-3 items-start py-1.5 border-b border-gray-800 last:border-0">
+      <span class="text-xs text-gray-500 w-28 flex-shrink-0 pt-0.5">${esc(k)}</span>
+      <span class="text-sm text-white font-mono break-all">${esc(String(v))}</span>
+    </div>`).join('');
+
+  return `<div class="p-4 space-y-3">
+    <div>
+      <div class="text-xs text-gray-600 uppercase tracking-widest mb-1">Tool</div>
+      <div class="text-sky-400 font-semibold text-sm">${esc(toolName)}</div>
+    </div>
+    ${rows ? `<div>${rows}</div>` : '<div class="text-xs text-gray-600 italic">Geen parameters ingevuld</div>'}
+  </div>`;
 }
 
 // ── Result formatters (Opgemaakt tab) ─────────────────────────────────────
@@ -619,6 +668,297 @@ function renderZoekterm(r) {
     </div>`;
 }
 
+// ── Structuur: opgemaakt (Opgemaakt tab) ──────────────────────────────────
+function renderStructuur(r) {
+  if (r.fout) return renderGeneric(r);
+  const norm = r.normalized;
+
+  // Header
+  const header = `
+    <div class="p-4 border-b border-gray-800 flex items-start justify-between">
+      <div>
+        <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
+        <div class="text-white text-xl font-bold mt-0.5 font-mono">${esc(r.bwbId ?? '')}</div>
+      </div>
+      <div class="text-xs text-gray-600 font-mono">${esc(r.versiedatum ?? '')}</div>
+    </div>`;
+
+  let body = '';
+  if (norm && (norm.type === 'artikel' || norm.type === 'circulaire_divisie')) {
+    // Gefilterd op één artikel: toon het volledig
+    body = renderNormArtikel(norm);
+  } else if (norm) {
+    // Volledig document: toon samenvatting
+    const children = norm.children || [];
+    const artCount = countArtikelen(r.raw);
+    body = `<div class="p-4 space-y-3">
+      <div class="flex gap-4 flex-wrap">
+        <div class="text-xs text-gray-500">type <span class="text-sky-400 ml-1">${esc(norm.type || '')}</span></div>
+        ${artCount > 0 ? `<div class="text-xs text-gray-500">artikelen <span class="text-amber-400 ml-1">${artCount}</span></div>` : ''}
+        <div class="text-xs text-gray-500">kinderen <span class="text-gray-300 ml-1">${children.length}</span></div>
+      </div>
+      <div class="text-xs text-gray-600 border-l-2 border-gray-800 pl-3 italic">
+        Open de <span class="text-blue-400">Boom</span>-tab voor de volledige interactieve structuurboom.
+      </div>
+    </div>`;
+  }
+
+  return header + body;
+}
+
+function countArtikelen(node, count = 0) {
+  if (!node || typeof node !== 'object') return count;
+  if (node.type === 'artikel' || node.type === 'circulaire_divisie') count++;
+  for (const c of (node.children || [])) count = countArtikelen(c, count);
+  return count;
+}
+
+function renderNormArtikel(norm) {
+  const ledenHtml = (norm.leden ?? []).map(lid => `
+    <div class="flex gap-3 py-2 border-b border-gray-800 last:border-0">
+      <div class="flex-shrink-0 w-10 text-right text-xs text-sky-500 font-mono pt-0.5">${lid.lidnr ? 'lid ' + esc(lid.lidnr) : ''}</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm text-gray-200 leading-relaxed">${renderContentItems(lid.content || [])}</div>
+        ${(lid.children || []).map(c => renderNormChild(c)).join('')}
+      </div>
+    </div>`).join('');
+
+  return `<div class="p-4 space-y-3">
+    <div>
+      ${norm.titel ? `<div class="text-gray-500 text-xs mb-0.5">${esc(norm.titel)}</div>` : ''}
+      <div class="text-white text-lg font-bold">Artikel ${esc(norm.nr || '')}</div>
+    </div>
+    <hr class="border-gray-800"/>
+    <div>${ledenHtml || '<div class="text-xs text-gray-600">Geen inhoud</div>'}</div>
+  </div>`;
+}
+
+function renderNormChild(node) {
+  if (!node) return '';
+  if (node.type === 'lijst') return renderNormLijst(node);
+  if (node.type === 'table') {
+    const g = (node.groups || [])[0];
+    if (!g) return '';
+    const rows = [...(g.head || []), ...(g.body || [])].slice(0, 6);
+    const tableRows = rows.map((row, i) => {
+      const cells = (row.cells || []).map(c =>
+        `<td class="border border-gray-800 px-2 py-1 text-xs text-gray-300">${esc(c.tekst || '')}</td>`
+      ).join('');
+      return `<tr ${i === 0 && g.head.length > 0 ? 'class="bg-gray-800"' : ''}>${cells}</tr>`;
+    }).join('');
+    return `<div class="mt-2 overflow-x-auto"><table class="boom-table">${tableRows}</table></div>`;
+  }
+  return '';
+}
+
+function renderNormLijst(lijst) {
+  const items = (lijst.items || []).map(item => `
+    <div class="flex gap-2 py-0.5 text-sm text-gray-300">
+      <span class="text-sky-500 font-mono flex-shrink-0 min-w-5">${esc(item.label)}</span>
+      <span class="leading-relaxed">${renderContentItems(item.content || [])}</span>
+    </div>`).join('');
+  return `<div class="ml-2 mt-1 border-l border-gray-800 pl-3 space-y-0.5">${items}</div>`;
+}
+
+// ── Inline content renderen ────────────────────────────────────────────────
+function renderContentItem(item) {
+  if (typeof item === 'string') return esc(item);
+  if (item.type === 'intref' || item.type === 'extref') {
+    const href = item.target ? esc(item.target) : '#';
+    return `<a class="text-cyan-400 hover:underline" href="${href}" title="${href}" target="_blank">${esc(item.label || item.target || item.type)}</a>`;
+  }
+  if (item.type === 'nadruk') {
+    const inner = (item.content || []).map(renderContentItem).join('');
+    return item.nadrukType === 'vet'
+      ? `<strong class="text-white font-semibold">${inner}</strong>`
+      : `<em class="text-gray-300">${inner}</em>`;
+  }
+  if (item.type === 'sup') return `<sup class="text-xs">${(item.content||[]).map(renderContentItem).join('')}</sup>`;
+  if (item.type === 'sub') return `<sub class="text-xs">${(item.content||[]).map(renderContentItem).join('')}</sub>`;
+  if (item.type === 'br') return '<br>';
+  const inner = (item.content || []).map(renderContentItem).join('');
+  return `<span class="text-gray-500">[${esc(item.type)}${inner ? ':' + inner : ''}]</span>`;
+}
+
+function renderContentItems(items) {
+  return (items || []).map(renderContentItem).join('');
+}
+
+// ── Structuurboom (Boom tab) ──────────────────────────────────────────────
+
+/** Kleuren per node-type in de boom. */
+function nodeTypeColor(type) {
+  const map = {
+    artikel:'text-sky-400', enig_artikel:'text-sky-400', circulaire_divisie:'text-sky-500',
+    lid:'text-amber-400',
+    al:'text-green-400', tekst:'text-green-500',
+    lijst:'text-orange-400', li:'text-orange-500',
+    hoofdstuk:'text-purple-400', afdeling:'text-purple-400',
+    paragraaf:'text-purple-500', sub_paragraaf:'text-purple-500',
+    deel:'text-purple-300', boek:'text-purple-300', titeldeel:'text-purple-300',
+    table:'text-rose-400', tgroup:'text-rose-500',
+    thead:'text-rose-400', tbody:'text-rose-400', tfoot:'text-rose-400',
+    row:'text-rose-500', entry:'text-rose-600', colspec:'text-rose-700',
+    intref:'text-cyan-500', extref:'text-cyan-500',
+    nadruk:'text-yellow-500', sup:'text-yellow-600', sub:'text-yellow-600',
+    toestand:'text-gray-500',
+  };
+  return map[type] || 'text-gray-400';
+}
+
+const BOOM_MAX_DEPTH = 25;
+
+/**
+ * Rendert één BwbNode of NormalizedNode als een <details>/<summary>-boom.
+ * Werkt met zowel RAW (children + content) als NORMALIZED (leden + items + groups + children).
+ */
+function renderBwbTree(node, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > BOOM_MAX_DEPTH) return '';
+
+  const type   = node.type || '?';
+  const color  = nodeTypeColor(type);
+  const meta   = node.metadata || {};
+  const nr     = node.nr     || meta.nr    || meta.lidnr || meta.linr || '';
+  const titel  = node.titel  || meta.titel || '';
+  const id     = node.id     || '';
+
+  const children = node.children || [];
+  const content  = node.content;            // BwbNode mixed content
+  const leden    = node.leden;              // NormalizedArtikel
+  const items    = node.items;              // NormalizedLijst
+  const groups   = node.groups;            // NormalizedTable
+  const tekst    = node.tekst || '';       // NormalizedLid / NormalizedLeaf
+
+  const hasChildren = children.length > 0;
+  const hasContent  = Array.isArray(content) && content.length > 0;
+  const hasLeden    = Array.isArray(leden) && leden.length > 0;
+  const hasItems    = Array.isArray(items) && items.length > 0;
+  const hasGroups   = Array.isArray(groups) && groups.length > 0;
+  const isExpandable = hasChildren || hasContent || hasLeden || hasItems || hasGroups;
+
+  const indent = `style="margin-left:${depth * 14}px"`;
+
+  // Samenvatting-regel
+  const head = [
+    `<span class="${color} text-xs font-semibold">${esc(type)}</span>`,
+    nr    ? `<span class="text-amber-300 text-xs font-mono ml-1">${esc(nr)}</span>` : '',
+    titel ? `<span class="text-gray-400 text-xs ml-1">${esc(titel.length > 55 ? titel.slice(0, 55) + '…' : titel)}</span>` : '',
+    (!nr && !titel && meta.label) ? `<span class="text-gray-600 text-xs ml-1">${esc(meta.label)}</span>` : '',
+    tekst && !hasContent && !hasLeden ? `<span class="text-gray-600 text-xs ml-2 italic">${esc(tekst.length > 60 ? tekst.slice(0, 60) + '…' : tekst)}</span>` : '',
+  ].join('');
+  const idSpan = id ? `<span class="tree-id text-gray-700 text-xs font-mono ml-2">${esc(id)}</span>` : '';
+
+  if (!isExpandable) {
+    return `<div class="tree-leaf flex items-center py-0.5 px-1" ${indent}>
+      <span class="text-gray-700 text-xs mr-1 flex-shrink-0">·</span>
+      ${head}${idSpan}
+    </div>`;
+  }
+
+  // Bepaal of de details standaard open zijn
+  const openByDefault = depth <= 1 ||
+    type === 'artikel' || type === 'circulaire_divisie' || type === 'lid';
+
+  let body = '';
+
+  // 1. Mixed content (al, entry)
+  if (hasContent) {
+    body += `<div class="ml-4 px-2 py-1 text-xs text-gray-300 leading-relaxed border-l border-gray-800">
+      ${renderContentItems(content)}
+    </div>`;
+  }
+
+  // 2. NormalizedArtikel leden
+  if (hasLeden) {
+    for (const lid of leden) body += renderBwbTree(lid, depth + 1);
+  }
+
+  // 3. NormalizedLijst items
+  if (hasItems) {
+    for (const item of items) body += renderBwbTree(item, depth + 1);
+  }
+
+  // 4. NormalizedTable tgroepen
+  if (hasGroups) {
+    for (const g of groups) body += renderBoomTableGroup(g, depth + 1);
+  }
+
+  // 5. Structurele kinderen
+  for (const child of children) body += renderBwbTree(child, depth + 1);
+
+  return `<details ${openByDefault ? 'open' : ''} class="tree-node">
+    <summary class="flex items-center py-0.5 px-1 cursor-pointer rounded" ${indent}>
+      <span class="tree-arrow mr-0.5 text-gray-600 text-xs flex-shrink-0">▾</span>
+      ${head}${idSpan}
+    </summary>
+    <div class="tree-body">${body}</div>
+  </details>`;
+}
+
+/** CALS tgroup als compacte HTML-tabel. */
+function renderBoomTableGroup(g, depth) {
+  const indent = `style="margin-left:${depth * 14}px"`;
+  const allRows = [...(g.head || []), ...(g.body || [])];
+  if (!allRows.length) return '';
+
+  const tableHtml = allRows.slice(0, 8).map((row, i) => {
+    const isHead = i < (g.head || []).length;
+    const cells = (row.cells || []).map(c => {
+      const rs = c.rowspan > 1 ? ` rowspan="${c.rowspan}"` : '';
+      const cs = c.colspan > 1 ? ` colspan="${c.colspan}"` : '';
+      const tag = isHead ? 'th' : 'td';
+      return `<${tag}${rs}${cs}>${esc(c.tekst || '')}</${tag}>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  return `<details class="tree-node">
+    <summary class="flex items-center py-0.5 px-1 cursor-pointer rounded" ${indent}>
+      <span class="tree-arrow mr-0.5 text-gray-600 text-xs flex-shrink-0">▾</span>
+      <span class="text-rose-400 text-xs font-semibold">tgroup</span>
+      <span class="text-gray-600 text-xs ml-1">${g.cols} kol · ${(g.head||[]).length} header + ${(g.body||[]).length} rijen</span>
+    </summary>
+    <div class="tree-body ml-4 overflow-x-auto p-2">
+      <table class="boom-table">${tableHtml}</table>
+      ${allRows.length > 8 ? `<div class="text-xs text-gray-700 mt-1">… ${allRows.length - 8} meer rijen verborgen</div>` : ''}
+    </div>
+  </details>`;
+}
+
+/** Rendert de volledige Boom-tab voor een structuur-resultaat. */
+function renderStructuurBoom(r) {
+  const norm = r.normalized;
+  const raw  = r.raw;
+  if (!norm && !raw) return '<div class="text-gray-700 text-xs p-4">Geen structuurdata.</div>';
+
+  return `<div class="p-2 space-y-2">
+    <div class="flex items-center gap-2 flex-wrap sticky top-0 bg-gray-950 pb-1.5 border-b border-gray-800 mb-1">
+      <button class="boom-view-btn boom-view-on" id="boom-btn-norm"
+        onclick="setBoomView('normalized')">NORMALIZED</button>
+      <button class="boom-view-btn boom-view-off" id="boom-btn-raw"
+        onclick="setBoomView('raw')">RAW</button>
+      <span class="text-xs text-gray-600">${esc(r.citeertitel || r.bwbId || '')}</span>
+      <span class="text-xs text-gray-700 font-mono">${esc(r.versiedatum || '')}</span>
+    </div>
+    <div id="boom-content" class="font-mono text-xs leading-relaxed">
+      ${renderBwbTree(norm)}
+    </div>
+  </div>`;
+}
+
+/** Wisselt tussen RAW en NORMALIZED in de Boom-tab. */
+function setBoomView(view) {
+  if (!lastResult || (!lastResult.raw && !lastResult.normalized)) return;
+  const node = view === 'raw' ? lastResult.raw : lastResult.normalized;
+  const content = $('boom-content');
+  if (content) content.innerHTML = renderBwbTree(node);
+  const btnNorm = $('boom-btn-norm');
+  const btnRaw  = $('boom-btn-raw');
+  if (btnNorm) { btnNorm.className = `boom-view-btn ${view==='normalized'?'boom-view-on':'boom-view-off'}`; }
+  if (btnRaw)  { btnRaw.className  = `boom-view-btn ${view==='raw'?'boom-view-on':'boom-view-off'}`; }
+}
+
+// ── Generic fallback ──────────────────────────────────────────────────────
 function renderGeneric(r) {
   if (r && typeof r === 'object' && r.fout) {
     return `<div class="p-4 text-red-400 text-sm">${esc(r.fout)}</div>`;
@@ -633,12 +973,18 @@ function renderGeneric(r) {
 }
 
 function formatResult(result) {
-  if (result === null || result === undefined) return '<span class="text-gray-600 text-xs p-4">Leeg resultaat</span>';
+  if (result === null || result === undefined)
+    return '<span class="text-gray-600 text-xs p-4">Leeg resultaat</span>';
   if (typeof result === 'string') return marked.parse(result);
   if (typeof result !== 'object') return `<pre class="p-4 text-xs text-gray-300">${esc(String(result))}</pre>`;
   if (result.fout) return renderGeneric(result);
+  // Structuurboom (wettenbank_structuur)
+  if (result.raw !== undefined && result.normalized !== undefined) return renderStructuur(result);
+  // Artikel
   if (result.citeertitel && result.leden !== undefined) return renderArtikel(result);
+  // Zoekterm
   if (result.zoekterm !== undefined && result.artikelen !== undefined) return renderZoekterm(result);
+  // Zoek
   if (result.regelingen !== undefined) return renderZoek(result);
   return renderGeneric(result);
 }
@@ -646,8 +992,19 @@ function formatResult(result) {
 // ── Response renderen ─────────────────────────────────────────────────────
 function renderResponse(result, store = true) {
   if (store) lastResult = result;
+
+  // Opgemaakt tab
   respFmt.innerHTML = formatResult(result);
+
+  // JSON tab
   respRaw.innerHTML = highlight(JSON.stringify(result, null, 2));
+
+  // Boom tab
+  if (result && result.raw !== undefined && result.normalized !== undefined) {
+    respTree.innerHTML = renderStructuurBoom(result);
+  } else {
+    respTree.innerHTML = '<div class="text-gray-700 text-xs p-4">Geen structuurboom — gebruik wettenbank_structuur.</div>';
+  }
 }
 
 // ── Uitvoeren ─────────────────────────────────────────────────────────────
@@ -656,9 +1013,9 @@ runBtn.addEventListener('click', async () => {
   runBtn.disabled = true; runBtn.textContent = 'Bezig...';
   respFmt.innerHTML = '<span class="text-gray-600 text-xs">wachten...</span>';
   respRaw.textContent = 'wachten...';
+  respTree.innerHTML = '<div class="text-gray-700 text-xs p-4">Wachten op response...</div>';
   durBadge.classList.add('hidden');
 
-  // Mobiel: switch naar Respons-tab
   if (isMobile()) {
     const btn = document.querySelector('.mob-tab[data-target="resp"]');
     if (btn) setMobTab(btn, 'resp');
@@ -672,8 +1029,9 @@ runBtn.addEventListener('click', async () => {
     const ms = Date.now() - t0;
     if (data.error) {
       const msg = typeof data.error === 'string' ? data.error : (data.error.message ?? JSON.stringify(data.error));
-      respFmt.innerHTML = `<div class="text-red-400 text-xs">Fout: ${esc(msg)}</div>`;
+      respFmt.innerHTML = `<div class="text-red-400 text-xs p-4">Fout: ${esc(msg)}</div>`;
       respRaw.textContent = JSON.stringify(data.error, null, 2);
+      respTree.innerHTML = `<div class="text-red-400 text-xs p-4">Fout: ${esc(msg)}</div>`;
       durBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-900 text-red-400';
     } else {
       renderResponse(data.result);
@@ -682,7 +1040,7 @@ runBtn.addEventListener('click', async () => {
     durBadge.textContent = `${ms}ms`;
     durBadge.classList.remove('hidden');
   } catch(e) {
-    respFmt.innerHTML = `<div class="text-red-400 text-xs">Fout: ${esc(e.message)}</div>`;
+    respFmt.innerHTML = `<div class="text-red-400 text-xs p-4">Fout: ${esc(e.message)}</div>`;
   } finally {
     runBtn.disabled = false; runBtn.textContent = 'Uitvoeren';
   }
@@ -702,7 +1060,6 @@ $('clear-btn').addEventListener('click', () => sseLog.innerHTML = '');
 
 // ── Desktop resize handles ────────────────────────────────────────────────
 (function initResize() {
-  // Verticale handle: req/resp breedte aanpassen
   let dragV = false, startX, startW;
   handleV.addEventListener('pointerdown', e => {
     if (isMobile()) return;
@@ -728,7 +1085,6 @@ $('clear-btn').addEventListener('click', () => sseLog.innerHTML = '');
     document.body.style.userSelect = '';
   });
 
-  // Horizontale handle: stream hoogte aanpassen
   let dragH = false, startY, startH;
   handleH.addEventListener('pointerdown', e => {
     if (isMobile()) return;

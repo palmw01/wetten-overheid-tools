@@ -1,21 +1,10 @@
-# Gecompileerde output — broncode in src/ is maatgevend
+# Gecompileerde output
 wettenbank-mcp/dist/
+mcp-debugger/dist/
 
-# npm-afhankelijkheden — nooit relevant voor analyse of review
+# npm-afhankelijkheden
 wettenbank-mcp/node_modules/
+mcp-debugger/node_modules/
 
-# Lock-bestand — geen analytische waarde
-wettenbank-mcp/package-lock.json
-
-# Gegenereerde wetsanalyse-rapporten — groot en on-demand bereikbaar via Glob/Read
-analyses/
-
-# Presentaties — niet relevant voor juridische analyse
-presentaties/
-
-# Referentiedocumentatie — uitsluitend op aanvraag via Read, nooit auto-laden
-jas-workflow.md
-
-# MCP-servercode en package-metadata — niet relevant tijdens JAS-runs
-wettenbank-mcp/src/
-wettenbank-mcp/package.json
+# Lokale instellingen
+.claude/settings.local.json

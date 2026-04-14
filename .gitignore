@@ -1,15 +1,10 @@
-# Node
-wettenbank-mcp/node_modules/
-wettenbank-mcp/dist/
-mcp-debugger/node_modules/
-mcp-debugger/dist/
+# Node / TypeScript
+node_modules/
+dist/
+*.tsbuildinfo
 
-# Lokale Claude Code instellingen (machine-specifiek)
+# Docker
+.docker-volumes/
+
+# Lokale Claude Code instellingen
 .claude/settings.local.json
-
-# Gegenereerde wetsanalyse-rapporten — on-demand, niet in versiebeheer
-
-# Gegenereerde HTML-renders
-analyses/*.html
-presentaties/*.html
-
