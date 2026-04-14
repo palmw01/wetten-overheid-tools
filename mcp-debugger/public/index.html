@@ -569,7 +569,7 @@ function renderArtikel(r) {
     const toonLid = lid.lid && lid.lid !== "0";
     return `
     <div class="flex gap-3 py-2 border-b border-gray-800 last:border-0">
-      ${toonLid ? `<div class="flex-shrink-0 w-16 text-right text-xs text-sky-500 font-mono pt-0.5">lid ${esc(lid.lid)}</div>` : ''}
+      ${toonLid ? `<div class="flex-shrink-0 w-10 text-right text-[10px] uppercase text-sky-600 font-mono pt-1 leading-none">lid<br/><span class="text-sm font-bold text-sky-400">${esc(lid.lid)}</span></div>` : ''}
       <div class="text-sm text-gray-200 leading-relaxed md flex-1 min-w-0">${marked.parse(stripLidPrefix(lid.tekst))}</div>
     </div>`;
   }).join('');
