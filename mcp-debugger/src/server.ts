@@ -63,8 +63,22 @@ registerTool(
   },
   async (args) => {
     const mem = process.memoryUsage();
+    const now = new Date();
+    // Handmatig ISO-achtig formaat bouwen met lokale tijd
+    const offset = -now.getTimezoneOffset();
+    const diff = offset >= 0 ? "+" : "-";
+    const pad = (num: number) => String(num).padStart(2, "0");
+    const localISO = 
+      now.getFullYear() + "-" +
+      pad(now.getMonth() + 1) + "-" +
+      pad(now.getDate()) + "T" +
+      pad(now.getHours()) + ":" +
+      pad(now.getMinutes()) + ":" +
+      pad(now.getSeconds()) +
+      diff + pad(Math.floor(Math.abs(offset) / 60)) + ":" + pad(Math.abs(offset) % 60);
+
     return {
-      timestamp: new Date().toISOString(),
+      timestamp: localISO,
       uptime_seconds: Math.floor(process.uptime()),
       nodeVersion: process.version,
       platform: process.platform,

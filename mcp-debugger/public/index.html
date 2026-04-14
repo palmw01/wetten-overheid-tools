@@ -494,7 +494,13 @@ function buildForm(schema) {
       el.type = isDate ? 'date' : 'text'; el.className = base; el.dataset.type = 'string';
       if (!isDate) el.placeholder = def.description ?? key;
       if (def.default !== undefined) el.value = def.default;
-      else if (isDate) el.value = new Date().toISOString().slice(0, 10);
+      else if (isDate) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        el.value = `${year}-${month}-${day}`;
+      }
     }
 
     el.id = `f-${key}`; el.dataset.key = key;
