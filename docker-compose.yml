@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   mcp-debugger:
-    image: ghcr.io/palmw01/wetten-overheid:latest
+    image: ghcr.io/palmw01/wetten-overheid-tools:latest
     container_name: mcp-debugger
     restart: unless-stopped
     environment:
@@ -12,8 +12,8 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - /volume1/docker/mcp-debugger/config:/app/config
-      - /volume1/docker/mcp-debugger/logs:/app/logs
+      - /volume1/docker/wetten-overheid-tools/config:/app/config
+      - /volume1/docker/wetten-overheid-tools/logs:/app/logs
     networks:
       - internal
 
