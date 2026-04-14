@@ -138,7 +138,7 @@
 <header class="flex-none flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
   <div class="flex items-center gap-2">
     <span class="font-bold text-white tracking-tight text-sm">MCP Debugger</span>
-    <span class="text-xs text-gray-600">v1.2</span>
+    <span class="text-xs text-gray-600">v1.3</span>
   </div>
   <div class="flex items-center gap-2">
     <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-600 inline-block"></span>
@@ -545,25 +545,6 @@ function renderFormattedRequest(toolName, args) {
   </div>`;
 }
 
-// ── MCP-Lite: opgemaakt (Opgemaakt tab) ──────────────────────────────────
-function renderMcpLite(items) {
-  if (!Array.isArray(items)) return renderGeneric(items);
-  
-  return items.map(item => `
-    <div class="p-4 border-b border-gray-800 last:border-0 space-y-3">
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <div class="text-xs text-gray-600 mb-1 leading-relaxed">${esc(item.sectie || '')}</div>
-          <div class="text-sky-400 text-xs font-medium">${esc(item.citeertitel || '')}</div>
-        </div>
-        <div class="flex-shrink-0 text-xs text-gray-500 font-mono">${esc(item.bwbId || '')}</div>
-      </div>
-      <div class="text-sm text-gray-200 leading-relaxed md">${marked.parse(item.tekst || '')}</div>
-      <div class="text-xs text-gray-700 font-mono break-all">${esc(item.bronreferentie || '')}</div>
-    </div>
-  `).join('');
-}
-
 // ── Result formatters (Opgemaakt tab) ─────────────────────────────────────
 function stripLidPrefix(tekst) {
   return tekst.replace(/^\d+(?:\.\d+)?\s{1,4}/, '');
@@ -588,20 +569,12 @@ function renderArtikel(r) {
     ? `<div class="mt-3 px-3 py-2 rounded border border-amber-700 bg-amber-950 text-amber-300 text-xs">${esc(r.waarschuwing)}</div>`
     : '';
 
-  // Als mcpLite aanwezig is, toon dat onder het artikel
-  const mcpLiteHtml = r.mcpLite ? `
-    <div class="mt-4 pt-4 border-t border-gray-800">
-      <div class="text-[10px] text-gray-600 uppercase tracking-widest mb-2">MCP-Lite (LLM-geoptimaliseerd)</div>
-      <div class="bg-gray-900/50 rounded-lg border border-gray-800/50">
-        ${renderMcpLite(r.mcpLite)}
-      </div>
-    </div>` : '';
-
   return `
     <div class="p-4 space-y-3">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           ${breadcrumb ? `<div class="text-xs text-gray-600 mb-1 leading-relaxed">${breadcrumb}</div>` : ''}
+          ${r.sectie ? `<div class="text-[10px] text-gray-500 font-mono mb-1 uppercase tracking-tight">${esc(r.sectie)}</div>` : ''}
           <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
           <div class="text-white text-xl font-bold mt-0.5">Artikel ${esc(r.artikel ?? '')}</div>
         </div>
@@ -612,7 +585,6 @@ function renderArtikel(r) {
       <hr class="border-gray-800"/>
       <div class="text-xs text-gray-700 font-mono">${esc(r.bronreferentie ?? '')}</div>
       ${waarschuwing}
-      ${mcpLiteHtml}
     </div>`;
 }
 
@@ -693,7 +665,7 @@ function formatResult(result) {
   if (typeof result !== 'object') return `<pre class="p-4 text-xs text-gray-300">${esc(String(result))}</pre>`;
   if (result.fout) return renderGeneric(result);
   // Artikel
-  if (result.citeertitel && (result.leden !== undefined || result.mcpLite !== undefined)) return renderArtikel(result);
+  if (result.citeertitel && result.leden !== undefined) return renderArtikel(result);
   // Zoekterm
   if (result.zoekterm !== undefined && result.artikelen !== undefined) return renderZoekterm(result);
   // Zoek

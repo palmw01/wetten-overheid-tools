@@ -952,8 +952,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (artikelTekst) {
         const statusWaarschuwing = detecteerArtikelStatus(rawXml, artikel);
 
-        // Genereer MCP-Lite output voor LLM
-        let mcpLite: unknown[] | undefined = undefined;
+        // Gebruik MCP-Lite transformatie voor schone Markdown tekst
+        let finaleLeden = leden;
+        let finaleSectie: string | undefined = undefined;
+        let finaleStructuurpad = structuurpad;
+
         if (rawXml) {
           const { transformToMcpLite, normalizeNode } = await import("./bwb-parser/index.js");
           const parseResult = parseBwb(rawXml, bwbId, wetNaam, versiedatum);
@@ -966,7 +969,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             if (lidnr) {
               results = results.filter(n => n.sectie.endsWith(` > Lid ${lidnr}`));
             }
-            mcpLite = results;
+
+            if (results.length > 0) {
+              // De sectie-naam halen we uit het eerste resultaat (zonder het lid-stukje)
+              finaleSectie = results[0].sectie.split(" > Lid ")[0];
+              
+              // We bouwen de leden array op basis van de getransformeerde tekst
+              finaleLeden = results.map(r => {
+                const match = r.sectie.match(/Lid (.*)$/);
+                return {
+                  lid: match ? match[1] : "",
+                  tekst: r.tekst
+                };
+              });
+
+              // Als we maar 1 resultaat hebben zonder lid-nummer, noemen we het lid "0" (standaard)
+              if (finaleLeden.length === 1 && finaleLeden[0].lid === "") {
+                finaleLeden[0].lid = "0";
+              }
+            }
           }
         }
 
@@ -976,9 +997,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           bwbId,
           artikel,
           ...(lidnr !== null && { lid: lidnr }),
-          structuurpad,
-          leden,
-          mcpLite,
+          sectie: finaleSectie,
+          structuurpad: finaleStructuurpad,
+          leden: finaleLeden,
           bronreferentie: jci,
           waarschuwing: statusWaarschuwing ?? null,
         };

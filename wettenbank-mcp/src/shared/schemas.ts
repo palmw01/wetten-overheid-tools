@@ -89,10 +89,10 @@ export const ArtikelOutputSchema = z.object({
   versiedatum: z.string(),
   bwbId: z.string(),
   artikel: z.string(),
-  lid: z.string().optional(), // alleen aanwezig als lid-filter gebruikt werd
+  lid: z.string().optional(),
+  sectie: z.string().optional(), // Bijv. "Hoofdstuk 1 > Artikel 1"
   structuurpad: z.array(z.string()),
   leden: z.array(z.object({ lid: z.string(), tekst: z.string() })),
-  mcpLite: z.array(z.unknown()).optional(), // MCP-Lite format (token-efficiënt voor LLM)
   bronreferentie: z.string(),
   waarschuwing: z.string().nullable(),
 });
