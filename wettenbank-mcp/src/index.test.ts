@@ -424,7 +424,7 @@ describe("zoekTermInArtikelDom", () => {
 
   it("vindt de term in de juiste artikelen", () => {
     const { artikelen: treffers } = zoekTermInArtikelDom(dom, /termijn/gi);
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers).toContain("1");
     expect(nummers).toContain("2");
     expect(nummers).not.toContain("3");
@@ -432,7 +432,7 @@ describe("zoekTermInArtikelDom", () => {
 
   it("telt meerdere treffers in één artikel correct", () => {
     const { artikelen: treffers } = zoekTermInArtikelDom(dom, /termijn/gi);
-    const art2 = treffers.find(t => t.artikelnummer === "2");
+    const art2 = treffers.find(t => t.artikel === "2");
     expect(art2?.aantalTreffers).toBe(2);
   });
 
@@ -442,7 +442,7 @@ describe("zoekTermInArtikelDom", () => {
 
   it("sorteert resultaten numeriek op artikelnummer", () => {
     const { artikelen: treffers } = zoekTermInArtikelDom(dom, /termijn/gi);
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers[0]).toBe("1");
     expect(nummers[1]).toBe("2");
   });
@@ -457,7 +457,7 @@ describe("zoekTermInArtikelDom", () => {
     const dom2 = domParser.parseFromString(xml2, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(dom2, /termijn/gi);
     expect(treffers).toHaveLength(1);
-    expect(treffers[0].artikelnummer).toBe("5");
+    expect(treffers[0].artikel).toBe("5");
     expect(treffers[0].aantalTreffers).toBe(1);
   });
 
@@ -476,7 +476,7 @@ describe("zoekTermInArtikelDom", () => {
 
   it("geeft lege leden-array voor artikel zonder <lid>-structuur", () => {
     const { artikelen: treffers } = zoekTermInArtikelDom(dom, /termijn/gi);
-    const art1 = treffers.find(t => t.artikelnummer === "1");
+    const art1 = treffers.find(t => t.artikel === "1");
     expect(art1?.leden).toEqual([]);
   });
 
@@ -488,8 +488,8 @@ describe("zoekTermInArtikelDom", () => {
     </wettekst></wetgeving>`;
     const dom3 = domParser.parseFromString(xml3, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(dom3, /artikel 9/gi);
-    const art5 = treffers.find(t => t.artikelnummer === "5");
-    const art9 = treffers.find(t => t.artikelnummer === "9");
+    const art5 = treffers.find(t => t.artikel === "5");
+    const art9 = treffers.find(t => t.artikel === "9");
     expect(art5?.aantalTreffers).toBe(1);
     expect(art9?.aantalTreffers).toBe(1);
   });
@@ -515,7 +515,7 @@ describe("zoekTermInArtikelDom", () => {
     const domToestand = domParser.parseFromString(xmlToestand, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(domToestand, /termijn/gi);
     expect(treffers.length).toBeGreaterThan(0);
-    expect(treffers.find(t => t.artikelnummer === "9")).toBeDefined();
+    expect(treffers.find(t => t.artikel === "9")).toBeDefined();
   });
 
   // ── Woordgrens (exacte match via parseZoekterm) ──────────────────────────────
@@ -528,7 +528,7 @@ describe("zoekTermInArtikelDom", () => {
     </wettekst></wetgeving>`;
     const domWg = domParser.parseFromString(xmlWg, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(domWg, parseZoekterm("termijn"));
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers).not.toContain("1"); // 'termijnen' is geen exacte match
     expect(nummers).toContain("2");
   });
@@ -542,7 +542,7 @@ describe("zoekTermInArtikelDom", () => {
     const domWc = domParser.parseFromString(xmlWc, "text/xml");
     // termijn* matcht 'termijn' en 'termijnen'; 'betalingstermijnen' heeft geen \b voor 't'
     const { artikelen: treffers } = zoekTermInArtikelDom(domWc, parseZoekterm("termijn*"));
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers).toContain("2"); // 'termijn' matcht
     expect(nummers).not.toContain("3");
   });
@@ -556,7 +556,7 @@ describe("zoekTermInArtikelDom", () => {
     const domPfx = domParser.parseFromString(xmlPfx, "text/xml");
     // *termijn matcht 'betalingstermijn' en 'termijn' maar NIET 'termijnoverschrijding'
     const { artikelen: treffers } = zoekTermInArtikelDom(domPfx, parseZoekterm("*termijn"));
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers).toContain("1"); // 'betalingstermijn' eindigt op 'termijn'
     expect(nummers).toContain("2"); // exact 'termijn'
     expect(nummers).not.toContain("3"); // 'termijnoverschrijding' begint met termijn, eindigt er niet op
@@ -572,7 +572,7 @@ describe("zoekTermInArtikelDom", () => {
     </wettekst></wetgeving>`;
     const domEn = domParser.parseFromString(xmlEn, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(domEn, parseZoekterm("aansprakelijkheid EN belasting"));
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers).toContain("1");    // bevat beide
     expect(nummers).not.toContain("2"); // mist 'belasting'
     expect(nummers).not.toContain("3"); // mist 'aansprakelijkheid'
@@ -595,7 +595,7 @@ describe("zoekTermInArtikelDom", () => {
     </wettekst></wetgeving>`;
     const domOf = domParser.parseFromString(xmlOf, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(domOf, parseZoekterm("uitstel OF afstel"));
-    const nummers = treffers.map(t => t.artikelnummer);
+    const nummers = treffers.map(t => t.artikel);
     expect(nummers).toContain("1");
     expect(nummers).toContain("2");
     expect(nummers).not.toContain("3");
@@ -611,7 +611,7 @@ describe("zoekTermInArtikelDom", () => {
     const domLid = domParser.parseFromString(xmlLid, "text/xml");
     const { artikelen: treffers } = zoekTermInArtikelDom(domLid, parseZoekterm("aansprakelijkheid EN belasting"));
     expect(treffers).toHaveLength(1);
-    expect(treffers[0].artikelnummer).toBe("5");
+    expect(treffers[0].artikel).toBe("5");
   });
 
   // ── isVolledig / totaalTreffers / maxResultaten ───────────────────────────────
@@ -646,7 +646,7 @@ describe("zoekTermInArtikelDom", () => {
   it("maxResultaten=1 geeft eerste artikel terug", () => {
     const result = zoekTermInArtikelDom(domVeel, parseZoekterm("termijn"), 1);
     expect(result.artikelen).toHaveLength(1);
-    expect(result.artikelen[0].artikelnummer).toBe("1");
+    expect(result.artikelen[0].artikel).toBe("1");
   });
 
   it("geen treffers: totaalTreffers=0, artikelen leeg, isVolledig=true", () => {

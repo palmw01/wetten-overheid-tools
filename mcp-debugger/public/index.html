@@ -561,6 +561,12 @@ function pill(tekst) {
   return `<span class="inline-block px-1.5 py-0.5 rounded text-xs bg-gray-800 text-gray-400 font-mono">${esc(tekst)}</span>`;
 }
 
+function formatBadge(formaat) {
+  if (!formaat) return '';
+  const kleur = formaat === 'markdown' ? 'bg-violet-900 text-violet-300' : 'bg-gray-800 text-gray-500';
+  return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono ${kleur}">${esc(formaat)}</span>`;
+}
+
 function renderArtikel(r) {
   const ledenHtml = (r.leden ?? []).map(lid => {
     const toonLid = lid.lid && lid.lid !== "0";
@@ -575,11 +581,15 @@ function renderArtikel(r) {
     <div class="p-4 space-y-3">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
+          ${r.pad ? `<div class="text-xs text-gray-600 font-mono mb-0.5">${esc(r.pad)}</div>` : ''}
           ${r.sectie ? `<div class="text-xs text-gray-500 font-mono mb-1">${esc(r.sectie)}</div>` : ''}
           <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
           <div class="text-white text-xl font-bold mt-0.5">Artikel ${esc(r.artikel ?? '')}</div>
         </div>
-        <div class="flex-shrink-0 text-xs text-gray-600 font-mono">${esc(r.versiedatum ?? '')}</div>
+        <div class="flex flex-col items-end gap-1 flex-shrink-0">
+          <div class="text-xs text-gray-600 font-mono">${esc(r.versiedatum ?? '')}</div>
+          ${formatBadge(r.formaat)}
+        </div>
       </div>
       <hr class="border-gray-800"/>
       <div>${ledenHtml || '<div class="text-xs text-gray-600 italic">Geen inhoud</div>'}</div>
@@ -613,13 +623,20 @@ function renderZoek(r) {
 function renderZoekterm(r) {
   const artikelen = (r.artikelen ?? []).map(art => {
     const ledenTags = (art.leden ?? []).map(l => pill('lid ' + l)).join(' ');
+    const tekstHtml = art.tekst
+      ? `<div class="mt-2 text-xs text-gray-400 leading-relaxed md border-l-2 border-gray-700 pl-3">${marked.parse(art.tekst)}</div>`
+      : '';
     return `
       <div class="py-2.5 border-b border-gray-800 last:border-0">
         <div class="flex items-center justify-between gap-2">
-          <div class="text-sm text-sky-300 font-medium">Artikel ${esc(art.artikelnummer)}</div>
-          <div class="text-xs text-gray-500">${art.aantalTreffers}×</div>
+          <div class="text-sm text-sky-300 font-medium">Artikel ${esc(art.artikel ?? '')}</div>
+          <div class="flex items-center gap-2">
+            ${formatBadge(art.formaat)}
+            <span class="text-xs text-gray-500">${art.aantalTreffers}×</span>
+          </div>
         </div>
         ${ledenTags ? `<div class="mt-1 flex flex-wrap gap-1">${ledenTags}</div>` : ''}
+        ${tekstHtml}
       </div>`;
   }).join('');
 
@@ -638,6 +655,46 @@ function renderZoekterm(r) {
       </div>
       <hr class="border-gray-800"/>
       <div>${artikelen || '<div class="text-xs text-gray-600">Geen treffers</div>'}</div>
+    </div>`;
+}
+
+function renderStructuurNodes(nodes, diepte) {
+  if (!nodes?.length) return '';
+  return nodes.map(node => {
+    const indent = diepte > 0 ? `ml-${Math.min(diepte * 4, 12)}` : '';
+    const typeLabel = node.type === 'wet' ? '' : `<span class="text-gray-600 text-[10px] uppercase tracking-wider mr-1">${esc(node.type)}</span>`;
+    const header = node.nr
+      ? `${typeLabel}<span class="text-sky-400 font-mono text-xs">${esc(node.nr)}</span>${node.titel ? ` <span class="text-gray-300 text-xs">${esc(node.titel)}</span>` : ''}`
+      : `<span class="text-gray-400 text-xs italic">Artikelen</span>`;
+    const artikelenHtml = (node.artikelen ?? []).length > 0
+      ? `<div class="mt-1 flex flex-wrap gap-1">${(node.artikelen).map(nr => pill('art. ' + nr)).join('')}</div>`
+      : '';
+    const sectiesHtml = renderStructuurNodes(node.secties, diepte + 1);
+    return `
+      <div class="${indent} py-1.5 border-b border-gray-800 last:border-0">
+        <div>${header}</div>
+        ${artikelenHtml}
+        ${sectiesHtml}
+      </div>`;
+  }).join('');
+}
+
+function renderStructuur(r) {
+  const structuurHtml = renderStructuurNodes(r.structuur, 0);
+  return `
+    <div class="p-4 space-y-3">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
+          <div class="text-white font-bold mt-0.5">Inhoudsopgave</div>
+        </div>
+        <div class="flex flex-col items-end gap-1 flex-shrink-0">
+          <div class="text-xs text-gray-600 font-mono">${esc(r.versiedatum ?? '')}</div>
+          ${pill(r.bwbId ?? '')}
+        </div>
+      </div>
+      <hr class="border-gray-800"/>
+      <div>${structuurHtml || '<div class="text-xs text-gray-600 italic">Geen structuur gevonden</div>'}</div>
     </div>`;
 }
 
@@ -661,6 +718,8 @@ function formatResult(result) {
   if (typeof result === 'string') return marked.parse(result);
   if (typeof result !== 'object') return `<pre class="p-4 text-xs text-gray-300">${esc(String(result))}</pre>`;
   if (result.fout) return renderGeneric(result);
+  // Structuur (voor artikel-check, want structuur heeft geen leden)
+  if (result.structuur !== undefined) return renderStructuur(result);
   // Artikel
   if (result.citeertitel && result.leden !== undefined) return renderArtikel(result);
   // Zoekterm
