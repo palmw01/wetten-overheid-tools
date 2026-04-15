@@ -65,7 +65,7 @@ registerTool(
     const mem = process.memoryUsage();
 
     return {
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString("sv-SE", { timeZone: "Europe/Amsterdam", hour12: false }).replace(" ", "T"),
       uptime_seconds: Math.floor(process.uptime()),
       nodeVersion: process.version,
       platform: process.platform,
