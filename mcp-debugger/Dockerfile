@@ -34,6 +34,7 @@ COPY mcp-debugger/public/ ./public/
 
 COPY --from=wettenbank-builder /wettenbank/dist ./wettenbank-mcp/dist
 COPY --from=wettenbank-builder /wettenbank/node_modules ./wettenbank-mcp/node_modules
+COPY wettenbank-mcp/package.json ./wettenbank-mcp/package.json
 
 RUN mkdir -p /app/config /app/logs && chown -R app:app /app
 USER app
