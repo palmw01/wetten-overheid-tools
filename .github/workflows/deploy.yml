@@ -2,7 +2,7 @@ name: Build & Push MCP Debugger
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "mcp-debugger/**"
       - "wettenbank-mcp/src/**"
