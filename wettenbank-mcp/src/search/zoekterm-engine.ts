@@ -86,6 +86,7 @@ export function zoekTermInArtikelDom(
     const clean = extractTextForSearch(art);
 
     patronen.forEach((pat, i) => {
+      pat.lastIndex = 0;
       const matches = clean.match(pat);
       if (matches) {
         const toAdd = Math.min(matches.length, 100 - entry.count);
@@ -101,7 +102,7 @@ export function zoekTermInArtikelDom(
       const lidnr = getElText(lid, "lidnr");
       if (!lidnr) continue;
       const lidText = extractTextForSearch(lid);
-      if (patronen.some((pat) => pat.test(lidText))) {
+      if (patronen.some((pat) => { pat.lastIndex = 0; return pat.test(lidText); })) {
         entry.leden.add(lidnr);
       }
     }
@@ -128,9 +129,10 @@ export function zoekTermInArtikelDom(
       return a.artikel.localeCompare(b.artikel);
     });
 
+  const totaalTreffers = alleArtikelen.reduce((s, t) => s + t.aantalTreffers, 0);
   return {
     artikelen: alleArtikelen.slice(0, maxResultaten),
-    totaalTreffers: alleArtikelen.reduce((s, t) => s + t.aantalTreffers, 0),
-    isVolledig: true,
+    totaalTreffers,
+    isVolledig: true, // DOM-parsing scant altijd het volledige document
   };
 }

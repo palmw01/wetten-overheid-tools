@@ -93,6 +93,10 @@ function processNode(
   }
 }
 
+function hasChildren(n: unknown): n is { children: NormalizedNode[] } {
+  return Array.isArray((n as Record<string, unknown>)?.children);
+}
+
 /**
  * Maakt één MCP-Lite node van een element (lid, artikel, of losse al/lijst).
  */
@@ -112,9 +116,8 @@ function createMcpLiteNode(
   }
 
   // 2. Kinderen (lijsten, tabellen) naar Markdown flattenen
-  const nodeWithChildren = node as any;
-  if (nodeWithChildren.children && Array.isArray(nodeWithChildren.children)) {
-    for (const child of nodeWithChildren.children) {
+  if (hasChildren(node)) {
+    for (const child of node.children) {
       tekstParts.push(renderNodeToMarkdown(child));
     }
   }

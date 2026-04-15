@@ -264,7 +264,7 @@ function normalizeTgroup(tgroup: BwbNode): NormalizedTableGroup {
     .filter((c) => c.type === "colspec")
     .map((cs, idx) => ({
       name: (cs.metadata.colname as string | undefined) ?? `col${idx}`,
-      colnum: cs.metadata.colnum ? parseInt(cs.metadata.colnum) : undefined,
+      colnum: cs.metadata.colnum ? parseInt(cs.metadata.colnum, 10) : undefined,
       colwidth: cs.metadata.colwidth,
     }));
 
@@ -273,7 +273,7 @@ function normalizeTgroup(tgroup: BwbNode): NormalizedTableGroup {
   );
 
   const cols = tgroup.metadata.cols
-    ? parseInt(tgroup.metadata.cols)
+    ? parseInt(tgroup.metadata.cols, 10)
     : colspecs.length || 1;
 
   const headNode = tgroup.children.find((c) => c.type === "thead");

@@ -22,7 +22,7 @@ const CONTAINER_TYPES = new Set([
   "titel",
   "deel",
   "boek",
-  "circulaire_tekst",
+  "circulaire-tekst",
 ]);
 
 // Artikel-types (leaf-nodes in de structuur)

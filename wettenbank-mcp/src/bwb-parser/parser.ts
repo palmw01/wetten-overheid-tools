@@ -274,7 +274,6 @@ function parseContentNodes(el: DomElement, bwbId: string, path: string[]): Conte
       } else if (tag === "al") {
          // Speciale case: al binnen mixed content (bijv. entry)
          // We parsen dit als een volwaardige BwbNode maar voegen hem toe als inline item
-         const segment = [normalizeType(tag), String(items.length)];
          const alNode = parseElement(childEl, bwbId, path, items.length);
          items.push({
            type: "al",

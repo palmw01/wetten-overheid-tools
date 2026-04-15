@@ -33,6 +33,10 @@ const sseClients = new Set<express.Response>();
 function broadcastEvent(event: string, data: unknown): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of sseClients) {
+    if (res.writableEnded || res.destroyed) {
+      sseClients.delete(res);
+      continue;
+    }
     try {
       res.write(payload);
     } catch {

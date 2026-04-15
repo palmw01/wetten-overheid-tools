@@ -48,6 +48,8 @@ export function getAttr(el: XNode | null, attrName: string): string {
 
 // ── SRU client ───────────────────────────────────────────────────────────────
 
+const FETCH_TIMEOUT_MS = 15_000;
+
 export async function sruRequest(query: string, maxRecords = 10): Promise<string> {
   const params = new URLSearchParams({
     operation: "searchRetrieve",
@@ -56,9 +58,18 @@ export async function sruRequest(query: string, maxRecords = 10): Promise<string
     query,
     maximumRecords: String(maxRecords),
   });
-  const res = await fetch(`${SRU_BASE}?${params}`, { headers: { Accept: "application/xml" } });
-  if (!res.ok) throw new Error(`SRU HTTP ${res.status}`);
-  return res.text();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${SRU_BASE}?${params}`, {
+      headers: { Accept: "application/xml" },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`SRU HTTP ${res.status}`);
+    return res.text();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export function parseRecords(xml: string): Regeling[] {

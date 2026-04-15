@@ -22,6 +22,14 @@ interface CacheEntry {
 export const xmlCache = new Map<string, CacheEntry>();
 const CACHE_TTL = 1000 * 60 * 60; // 1 uur
 
+// Verwijder verlopen entries elk uur zodat de cache niet onbegrensd groeit.
+setInterval(() => {
+  const nu = Date.now();
+  for (const [key, entry] of xmlCache) {
+    if (nu - entry.timestamp > CACHE_TTL) xmlCache.delete(key);
+  }
+}, CACHE_TTL).unref();
+
 function getCacheKey(bwbId: string, peildatum: string): string {
   return `${bwbId}|${peildatum}`;
 }
@@ -73,7 +81,14 @@ export async function haalWetstekstOp(
   }
   const r = lijst[0];
 
-  const resp = await fetch(r.repositoryUrl);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  let resp: Response;
+  try {
+    resp = await fetch(r.repositoryUrl, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!resp.ok) throw new Error(`Wetstekst repository onbereikbaar: ${resp.status}`);
 
   const rawXml = await resp.text();

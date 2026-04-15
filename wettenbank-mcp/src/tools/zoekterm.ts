@@ -4,6 +4,7 @@
  */
 
 import { ZoektermInputSchema } from "../shared/schemas.js";
+import { detecteerFormaat } from "../shared/utils.js";
 import {
   haalWetstekstOp,
   extraheerDocMetadata,
@@ -15,14 +16,6 @@ import {
   normalizeNode,
   transformToMcpLite,
 } from "../bwb-parser/index.js";
-
-function detecteerFormaat(tekst: string): "plain" | "markdown" {
-  if (/\|.*\|/.test(tekst)) return "markdown";
-  if (/^\d+\. /m.test(tekst)) return "markdown";
-  if (/^[a-z]\. /m.test(tekst)) return "markdown";
-  if (/^– /m.test(tekst)) return "markdown";
-  return "plain";
-}
 
 export async function handleZoekterm(args: unknown): Promise<string> {
   const parsed = ZoektermInputSchema.safeParse(args);

@@ -4,6 +4,7 @@
  */
 
 import { ArtikelInputSchema } from "../shared/schemas.js";
+import { detecteerFormaat } from "../shared/utils.js";
 import {
   haalWetstekstOp,
   extraheerDocMetadata,
@@ -14,14 +15,6 @@ import {
   normalizeNode,
   transformToMcpLite,
 } from "../bwb-parser/index.js";
-
-function detecteerFormaat(tekst: string): "plain" | "markdown" {
-  if (/\|.*\|/.test(tekst)) return "markdown";   // tabel
-  if (/^\d+\. /m.test(tekst)) return "markdown";  // genummerde lijst
-  if (/^[a-z]\. /m.test(tekst)) return "markdown"; // lettertjes-lijst
-  if (/^– /m.test(tekst)) return "markdown";       // streepjes-lijst
-  return "plain";
-}
 
 export async function handleArtikel(args: unknown): Promise<string> {
   const parsed = ArtikelInputSchema.safeParse(args);

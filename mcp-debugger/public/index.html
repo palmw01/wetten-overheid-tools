@@ -492,7 +492,13 @@ function buildForm(schema) {
     const lbl = document.createElement('label');
     lbl.htmlFor = `f-${key}`;
     lbl.className = 'text-xs text-gray-400';
-    lbl.innerHTML = key + (req.has(key) ? ' <span class="text-red-400">*</span>' : '');
+    lbl.textContent = key;
+    if (req.has(key)) {
+      const star = document.createElement('span');
+      star.className = 'text-red-400';
+      star.textContent = ' *';
+      lbl.appendChild(star);
+    }
 
     const isDate = key === 'peildatum' || (def.description ?? '').includes('YYYY-MM-DD');
     let el;

@@ -10,12 +10,17 @@
  *   wettenbank_zoekterm  — Full-text zoeken in een wet
  */
 
+import { createRequire } from "module";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+
+const { version: pkgVersion } = createRequire(import.meta.url)(
+  "../package.json"
+) as { version: string };
 import { handleZoek } from "./tools/zoek.js";
 import { handleStructuur } from "./tools/structuur.js";
 import { handleArtikel } from "./tools/artikel.js";
@@ -24,7 +29,7 @@ import { handleZoekterm } from "./tools/zoekterm.js";
 // ── Server instantie ──────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "wettenbank-mcp", version: "3.0.0" },
+  { name: "wettenbank-mcp", version: pkgVersion },
   { capabilities: { tools: {} } }
 );
 

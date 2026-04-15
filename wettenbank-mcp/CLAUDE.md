@@ -36,7 +36,8 @@ src/
 │   ├── artikel.ts           # wettenbank_artikel handler
 │   └── zoekterm.ts          # wettenbank_zoekterm handler
 ├── shared/
-│   └── schemas.ts           # Zod input/output schemas — single source of truth
+│   ├── schemas.ts           # Zod input/output schemas — single source of truth
+│   └── utils.ts             # Gedeelde helpers (detecteerFormaat)
 └── bwb-parser/              # XML → structured data pipeline (see below)
 ```
 
@@ -68,7 +69,11 @@ Uses `@xmldom/xmldom` (`DOMParser`) throughout. Mixed-content elements (`<al>`, 
 
 ### In-memory cache
 
-`xmlCache` in `repository-client.ts` (exported `Map<string, CacheEntry>`, 1-hour TTL) caches raw XML + parsed `Document` per BWB-id + date combination.
+`xmlCache` in `repository-client.ts` (exported `Map<string, CacheEntry>`, 1-hour TTL) caches raw XML + parsed `Document` per BWB-id + date combination. Verlopen entries worden automatisch elk uur verwijderd via een `setInterval(...).unref()` zodat de cache niet onbegrensd groeit.
+
+### HTTP timeouts
+
+Beide HTTP clients (`sruRequest` in `sru-client.ts` en `haalWetstekstOp` in `repository-client.ts`) gebruiken een `AbortController` met 15 seconden timeout. Na afloop wordt de timer altijd gecleard via `finally { clearTimeout(timeoutId) }`.
 
 ### Data flow
 
@@ -116,7 +121,7 @@ Key exports from `bwb-parser/index.ts`:
 | `*termijn` | `\w*termijn\b` | `termijn`, `betalingstermijn` |
 | `*termijn*` | `\w*termijn\w*` | anything containing `termijn` |
 
-`parseZoekterm(zoekterm)` normalises ` AND ` → ` EN ` and ` OR ` → ` OF `, splits on ` EN ` or ` OF `, and returns `ZoekInput { patronen: RegExp[], operator: "EN"|"OF" }`. With EN, only articles where all patterns occur are returned.
+`parseZoekterm(zoekterm)` normalises ` AND ` → ` EN ` and ` OR ` → ` OF `, splits on ` EN ` or ` OF `, and returns `ZoekInput { patronen: RegExp[], operator: "EN"|"OF" }`. With EN, only articles where all patterns occur are returned. Patterns carry the `gi` flags; `pat.lastIndex` is explicitly reset to `0` before every `.match()` / `.test()` call to prevent stateful drift when the same instance is reused across articles.
 
 Special characters are pre-escaped via `escapeerRegex()`.
 
