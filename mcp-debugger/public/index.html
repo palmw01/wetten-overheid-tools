@@ -189,11 +189,15 @@
     <!-- Request -->
     <div id="req-pane" class="border-r border-gray-800">
       <!-- Request pane tabs -->
-      <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center">
-        <button id="req-tab-btn-formatted" class="tab-on text-xs py-1.5 mr-4 transition-colors"
-          onclick="switchReqTab('formatted')">Opgemaakt</button>
-        <button id="req-tab-btn-json" class="tab-off text-xs py-1.5 transition-colors"
-          onclick="switchReqTab('json')">JSON</button>
+      <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+        <div class="flex items-center">
+          <button id="req-tab-btn-formatted" class="tab-on text-xs py-1.5 mr-4 transition-colors"
+            onclick="switchPaneTab('req','formatted')">Opgemaakt</button>
+          <button id="req-tab-btn-json" class="tab-off text-xs py-1.5 transition-colors"
+            onclick="switchPaneTab('req','json')">JSON</button>
+        </div>
+        <button id="req-copy-btn" onclick="copyPane('req')" title="Kopieer naar klembord"
+          class="text-xs text-gray-600 hover:text-gray-300 transition-colors select-none">Kopiëren</button>
       </div>
       <!-- Opgemaakte request -->
       <div id="request-formatted" class="flex-1 overflow-auto text-sm bg-gray-950 md leading-relaxed">
@@ -210,10 +214,14 @@
     <div id="resp-pane">
       <div class="flex-none px-4 py-0 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
         <div class="flex gap-4">
-          <button id="tab-btn-formatted" class="tab-on text-xs py-1.5 transition-colors" onclick="switchTab('formatted')">Opgemaakt</button>
-          <button id="tab-btn-raw"       class="tab-off text-xs py-1.5 transition-colors" onclick="switchTab('raw')">JSON</button>
+          <button id="tab-btn-formatted" class="tab-on text-xs py-1.5 transition-colors" onclick="switchPaneTab('resp','formatted')">Opgemaakt</button>
+          <button id="tab-btn-raw"       class="tab-off text-xs py-1.5 transition-colors" onclick="switchPaneTab('resp','raw')">JSON</button>
         </div>
-        <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
+        <div class="flex items-center gap-3">
+          <span id="duration-badge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400"></span>
+          <button id="resp-copy-btn" onclick="copyPane('resp')" title="Kopieer naar klembord"
+            class="text-xs text-gray-600 hover:text-gray-300 transition-colors select-none">Kopiëren</button>
+        </div>
       </div>
       <!-- Opgemaakt tab -->
       <div id="response-formatted" class="flex-1 overflow-auto p-3 text-sm bg-gray-950 md leading-relaxed">
@@ -375,24 +383,43 @@ function toggleForm() {
   else { fields.style.display = ''; btn.textContent = '▾'; btn.title = 'Invoervelden inklappen'; }
 }
 
-// ── Request pane tabs ─────────────────────────────────────────────────────
-function switchReqTab(tab) {
-  currentReqTab = tab;
-  $('req-tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 mr-4 transition-colors';
-  $('req-tab-btn-json').className       = (tab==='json'?'tab-on':'tab-off')      + ' text-xs py-1.5 transition-colors';
-  reqFmt.classList.toggle('hidden', tab !== 'formatted');
-  reqPanel.classList.toggle('hidden', tab !== 'json');
+// ── Pane tabs (request + response) ───────────────────────────────────────
+function switchPaneTab(pane, tab) {
+  if (pane === 'req') {
+    currentReqTab = tab;
+    $('req-tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 mr-4 transition-colors';
+    $('req-tab-btn-json').className       = (tab==='json'      ?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
+    reqFmt.classList.toggle('hidden', tab !== 'formatted');
+    reqPanel.classList.toggle('hidden', tab !== 'json');
+  } else {
+    currentTab = tab;
+    $('tab-btn-formatted').className = (tab==='formatted'?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
+    $('tab-btn-raw').className        = (tab==='raw'       ?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
+    respFmt.classList.toggle('hidden', tab !== 'formatted');
+    respRaw.classList.toggle('hidden', tab !== 'raw');
+    if (lastResult !== null) renderResponse(lastResult, false);
+  }
 }
 
-// ── Response tabs ─────────────────────────────────────────────────────────
-function switchTab(tab) {
-  currentTab = tab;
-  ['formatted','raw'].forEach(t => {
-    $(`tab-btn-${t}`).className = (tab===t?'tab-on':'tab-off') + ' text-xs py-1.5 transition-colors';
-  });
-  respFmt.classList.toggle('hidden', tab !== 'formatted');
-  respRaw.classList.toggle('hidden', tab !== 'raw');
-  if (lastResult !== null) renderResponse(lastResult, false);
+// ── Kopieer naar klembord ─────────────────────────────────────────────────
+async function copyPane(which) {
+  const text = which === 'req'
+    ? (lastRequestData ? JSON.stringify(lastRequestData, null, 2) : '')
+    : (lastResult !== null ? JSON.stringify(lastResult, null, 2) : '');
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = $(`${which}-copy-btn`);
+    const orig = btn.textContent;
+    btn.textContent = 'Gekopieerd ✓';
+    btn.classList.add('text-green-400');
+    btn.classList.remove('text-gray-600');
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove('text-green-400');
+      btn.classList.add('text-gray-600');
+    }, 1500);
+  } catch { /* klembord niet toegankelijk */ }
 }
 
 // ── SSE ───────────────────────────────────────────────────────────────────
@@ -581,8 +608,9 @@ function renderArtikel(r) {
     <div class="p-4 space-y-3">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          ${r.pad ? `<div class="text-xs text-gray-600 font-mono mb-0.5">${esc(r.pad)}</div>` : ''}
-          ${r.sectie ? `<div class="text-xs text-gray-500 font-mono mb-1">${esc(r.sectie)}</div>` : ''}
+          ${r.pad
+            ? `<div class="text-xs text-gray-600 font-mono mb-1">${esc(r.pad)}</div>`
+            : r.sectie ? `<div class="text-xs text-gray-500 font-mono mb-1">${esc(r.sectie)}</div>` : ''}
           <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
           <div class="text-white text-xl font-bold mt-0.5">Artikel ${esc(r.artikel ?? '')}</div>
         </div>
