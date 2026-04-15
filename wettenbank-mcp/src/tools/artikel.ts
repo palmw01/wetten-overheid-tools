@@ -7,7 +7,7 @@ import { ArtikelInputSchema } from "../shared/schemas.js";
 import {
   haalWetstekstOp,
   extraheerDocMetadata,
-  zoekElementInDom,
+  zoekPadEnElementInDom,
 } from "../clients/repository-client.js";
 import {
   parseElement,
@@ -34,10 +34,11 @@ export async function handleArtikel(args: unknown): Promise<string> {
   const meta = extraheerDocMetadata(doc);
   const wetNaam = meta.citeertitel || regeling.titel;
 
-  const artikelElement = zoekElementInDom(doc.documentElement, artikel);
-  if (!artikelElement) {
+  const gevonden = zoekPadEnElementInDom(doc.documentElement, artikel);
+  if (!gevonden) {
     return JSON.stringify({ fout: `Artikel ${artikel} niet gevonden.` });
   }
+  const { element: artikelElement, containerPad } = gevonden;
 
   const rawNode = parseElement(artikelElement, bwbId, []);
   const normalized = normalizeNode(rawNode);
@@ -47,13 +48,16 @@ export async function handleArtikel(args: unknown): Promise<string> {
     results = results.filter((n) => n.sectie.endsWith(` > Lid ${lidnr}`));
   }
 
-  // Bouw structuurpad uit het eerste resultaat via sectie-pad
+  // sectie = artikel-label uit het eerste resultaat (bijv. "Artikel 9")
   const eersteSectie = results[0]?.sectie ?? "";
   const sectionDelen = eersteSectie.split(" > ");
-  // pad = volledig pad tot artikel-niveau (zonder "Lid X")
   const padDelen = sectionDelen.filter((d) => !d.startsWith("Lid "));
-  const pad = padDelen.join(" > ") || undefined;
   const sectie = padDelen[padDelen.length - 1] || undefined;
+  // pad = volledig hiërarchisch pad inclusief containers (bijv. "Hoofdstuk V > Afdeling 5.1 > Artikel 9")
+  // Alleen aanwezig als het artikel in een container zit
+  const pad = containerPad.length > 0 && sectie
+    ? [...containerPad, sectie].join(" > ")
+    : undefined;
 
   const ledenData = results.map((r) => ({
     lid: r.sectie.match(/Lid (.*)$/)?.[1] || "",

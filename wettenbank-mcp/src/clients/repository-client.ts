@@ -93,20 +93,52 @@ export function extraheerDocMetadata(doc: XDocument): DocMetadata {
   return { citeertitel, versiedatum };
 }
 
-export function zoekElementInDom(el: XNode, artikelnummer: string): XElement | null {
+// Tags die structurele containers vormen (directe ancestors in het hiërarchisch pad)
+const CONTAINER_TAGS_DOM = new Set([
+  "boek", "deel", "hoofdstuk", "titel", "afdeling", "paragraaf", "subparagraaf",
+  "circulaire-tekst",
+]);
+
+/** Extraheert het leesbare label van een container-element via zijn <kop>. */
+function bouwContainerLabel(el: XElement): string | null {
+  const kop = el.getElementsByTagName("kop")[0];
+  if (!kop) return null;
+  const label = getElText(kop, "label");
+  const nr    = getElText(kop, "nr");
+  const titel = getElText(kop, "titel");
+  return [label, nr, titel].filter(Boolean).join(" ") || null;
+}
+
+/**
+ * Zoekt een artikel-element in de DOM en geeft zowel het element als het
+ * container-pad terug (bijv. ["Hoofdstuk V", "Afdeling 5.1"]).
+ * Bevat geen artikel-label zelf — alleen de omvattende containers.
+ */
+export function zoekPadEnElementInDom(
+  el: XNode,
+  artikelnummer: string,
+  huidigPad: string[] = [],
+): { element: XElement; containerPad: string[] } | null {
   if (el.nodeType !== 1) return null;
   const tag = el.tagName;
 
   if (tag === "artikel" || tag === "circulaire.divisie") {
     const nr = getElText(el.getElementsByTagName("kop")[0], "nr");
-    if (nr === artikelnummer) return el;
+    if (nr === artikelnummer) return { element: el, containerPad: huidigPad };
   }
 
+  const label = CONTAINER_TAGS_DOM.has(tag) ? bouwContainerLabel(el) : null;
+  const nieuwPad = label ? [...huidigPad, label] : huidigPad;
+
   for (let i = 0; i < el.childNodes.length; i++) {
-    const found = zoekElementInDom(el.childNodes.item(i), artikelnummer);
+    const found = zoekPadEnElementInDom(el.childNodes.item(i), artikelnummer, nieuwPad);
     if (found) return found;
   }
   return null;
+}
+
+export function zoekElementInDom(el: XNode, artikelnummer: string): XElement | null {
+  return zoekPadEnElementInDom(el, artikelnummer)?.element ?? null;
 }
 
 export function extractTextForSearch(el: XNode): string {

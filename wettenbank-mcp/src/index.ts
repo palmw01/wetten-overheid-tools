@@ -35,6 +35,7 @@ export {
   haalWetstekstOp,
   extraheerDocMetadata,
   zoekElementInDom,
+  zoekPadEnElementInDom,
   extractTextForSearch,
 } from "./clients/repository-client.js";
 export type { WetstekstResultaat, DocMetadata } from "./clients/repository-client.js";
