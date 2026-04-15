@@ -562,39 +562,29 @@ function pill(tekst) {
 }
 
 function renderArtikel(r) {
-  const breadcrumb = (r.structuurpad ?? [])
-    .map(s => `<span>${esc(s)}</span>`)
-    .join('<span class="mx-1 text-gray-700">›</span>');
-
   const ledenHtml = (r.leden ?? []).map(lid => {
     const toonLid = lid.lid && lid.lid !== "0";
     return `
     <div class="flex gap-3 py-2 border-b border-gray-800 last:border-0">
       ${toonLid ? `<div class="flex-shrink-0 w-10 text-right text-[10px] uppercase text-sky-600 font-mono pt-1 leading-none">lid<br/><span class="text-sm font-bold text-sky-400">${esc(lid.lid)}</span></div>` : ''}
-      <div class="text-sm text-gray-200 leading-relaxed md flex-1 min-w-0">${marked.parse(stripLidPrefix(lid.tekst))}</div>
+      <div class="text-sm text-gray-200 leading-relaxed md flex-1 min-w-0">${marked.parse(stripLidPrefix(lid.tekst ?? ''))}</div>
     </div>`;
   }).join('');
-
-  const waarschuwing = r.waarschuwing
-    ? `<div class="mt-3 px-3 py-2 rounded border border-amber-700 bg-amber-950 text-amber-300 text-xs">${esc(r.waarschuwing)}</div>`
-    : '';
 
   return `
     <div class="p-4 space-y-3">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          ${breadcrumb ? `<div class="text-xs text-gray-600 mb-1 leading-relaxed">${breadcrumb}</div>` : ''}
-          ${r.sectie ? `<div class="text-[10px] text-gray-500 font-mono mb-1 uppercase tracking-tight">${esc(r.sectie)}</div>` : ''}
+          ${r.sectie ? `<div class="text-xs text-gray-500 font-mono mb-1">${esc(r.sectie)}</div>` : ''}
           <div class="text-sky-400 text-xs font-medium">${esc(r.citeertitel ?? '')}</div>
           <div class="text-white text-xl font-bold mt-0.5">Artikel ${esc(r.artikel ?? '')}</div>
         </div>
         <div class="flex-shrink-0 text-xs text-gray-600 font-mono">${esc(r.versiedatum ?? '')}</div>
       </div>
       <hr class="border-gray-800"/>
-      <div>${ledenHtml || `<div class="text-sm text-gray-300">${esc(r.tekst ?? '')}</div>`}</div>
+      <div>${ledenHtml || '<div class="text-xs text-gray-600 italic">Geen inhoud</div>'}</div>
       <hr class="border-gray-800"/>
       <div class="text-xs text-gray-700 font-mono">${esc(r.bronreferentie ?? '')}</div>
-      ${waarschuwing}
     </div>`;
 }
 
@@ -612,16 +602,9 @@ function renderZoek(r) {
       </div>`;
   }).join('');
 
-  const dubbel = (r.dubbeleVerwijderd ?? 0) > 0
-    ? ` <span class="text-gray-600 text-xs">(${r.dubbeleVerwijderd} dubbel verwijderd)</span>` : '';
-
   return `
     <div class="p-4 space-y-3">
-      <div>
-        <div class="text-xs text-gray-600 mb-1">Zoekquery</div>
-        <div class="text-sm text-gray-300 font-mono">${esc(r.query ?? '')}</div>
-        <div class="text-xs text-gray-500 mt-1">${r.totaal ?? 0} regelingen${dubbel}</div>
-      </div>
+      <div class="text-xs text-gray-500">${r.totaal ?? 0} regelingen gevonden</div>
       <hr class="border-gray-800"/>
       <div>${items || '<div class="text-xs text-gray-600">Geen resultaten</div>'}</div>
     </div>`;
@@ -633,20 +616,24 @@ function renderZoekterm(r) {
     return `
       <div class="py-2.5 border-b border-gray-800 last:border-0">
         <div class="flex items-center justify-between gap-2">
-          <div class="text-sm text-sky-300 font-medium">Artikel ${esc(art.artikel)}</div>
+          <div class="text-sm text-sky-300 font-medium">Artikel ${esc(art.artikelnummer)}</div>
           <div class="text-xs text-gray-500">${art.aantalTreffers}×</div>
         </div>
         ${ledenTags ? `<div class="mt-1 flex flex-wrap gap-1">${ledenTags}</div>` : ''}
       </div>`;
   }).join('');
 
+  const aantalArtikelen = r.artikelen?.length ?? 0;
+  const volledigLabel = r.isVolledig === false
+    ? ' <span class="text-amber-500">(onvolledig)</span>' : '';
+
   return `
     <div class="p-4 space-y-3">
       <div>
-        <div class="text-xs text-gray-600 mb-1">${esc(r.wet ?? '')} · ${esc(r.versiedatum ?? '')}</div>
+        ${r.wet ? `<div class="text-xs text-gray-600 mb-1">${esc(r.wet)}</div>` : ''}
         <div class="flex items-baseline gap-2 flex-wrap">
           <span class="text-white font-semibold">"${esc(r.zoekterm ?? '')}"</span>
-          <span class="text-xs text-gray-500">${r.totaalTreffers ?? 0} treffers in ${r.aantalArtikelen ?? 0} artikelen</span>
+          <span class="text-xs text-gray-500">${r.totaalTreffers ?? 0} treffers in ${aantalArtikelen} artikelen${volledigLabel}</span>
         </div>
       </div>
       <hr class="border-gray-800"/>
@@ -688,11 +675,14 @@ function renderResponse(result, store = true) {
   if (store) lastResult = result;
 
   // Opgemaakt tab
-  respFmt.innerHTML = formatResult(result);
+  try {
+    respFmt.innerHTML = formatResult(result);
+  } catch(e) {
+    respFmt.innerHTML = `<div class="p-4 text-amber-400 text-xs">Render-fout: ${esc(e.message)}</div>`;
+  }
 
   // JSON tab
   respRaw.innerHTML = highlight(JSON.stringify(result, null, 2));
-
 }
 
 // ── Uitvoeren ─────────────────────────────────────────────────────────────

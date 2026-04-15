@@ -11,7 +11,6 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { XMLParser } from "fast-xml-parser";
 import { DOMParser } from "@xmldom/xmldom";
 import { fileURLToPath } from "url";
 
@@ -25,126 +24,48 @@ import {
 } from "./shared/schemas.js";
 import { parseBwb } from "./bwb-parser/index.js";
 
+// ── Types voor xmldom ────────────────────────────────────────────────────────
+// xmldom types wijken soms af van de lib.dom.d.ts types in Node.
+
+type XNode = any;
+type XElement = any;
+type XDocument = any;
+
+// ── Configuratie ─────────────────────────────────────────────────────────────
+
 const SRU_BASE = "https://zoekservice.overheid.nl/sru/Search";
 const REPO_BASE = "https://repository.officiele-overheidspublicaties.nl/bwb";
 
-// Bekende BWB-ids van kernwetten invordering — gebruikt in fout- en helpberichten
 const KERNWET_IDS = `IW 1990 → \`BWBR0004770\` | AWR → \`BWBR0002320\` | Awb → \`BWBR0005537\` | Leidraad 2008 → \`BWBR0024096\``;
 
+const MAX_TREFFERS_PER_ARTIKEL = 100;
+
+export const domParser = new DOMParser();
+
+// ── In-memory Cache ──────────────────────────────────────────────────────────
+
+interface CacheEntry {
+  rawXml: string;
+  doc: XDocument;
+  regeling: Regeling;
+  timestamp: number;
+}
+
+export const xmlCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 1000 * 60 * 60; // 1 uur
+
+function getCacheKey(bwbId: string, peildatum: string): string {
+  return `${bwbId}|${peildatum}`;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function vandaag(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  isArray: (name) => ["record"].includes(name),
-});
-
-// Parser voor BWB-toestand XML (wetgeving-documenten)
-// isArray gebaseerd op XSD toestand_base_2016-1.xsd (maxOccurs="unbounded")
-// stopNodes: al is mixed content (tekst + inline markup zoals intref, extref, nadruk)
-export const wetParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  isArray: (name) =>
-    [
-      "artikel", "lid", "li", "circulaire.divisie",
-      "paragraaf", "afdeling", "hoofdstuk", "boek", "deel",
-      "bwb-wijziging", "jci", "row", "tgroup",
-    ].includes(name),
-  stopNodes: ["*.al"],
-  trimValues: true,
-});
-
-export async function sruRequest(query: string, maxRecords = 10): Promise<string> {
-  const params = new URLSearchParams({
-    operation: "searchRetrieve",
-    version: "2.0",
-    "x-connection": "BWB",
-    query,
-    maximumRecords: String(maxRecords),
-  });
-  const res = await fetch(`${SRU_BASE}?${params}`, { headers: { Accept: "application/xml" } });
-  if (!res.ok) throw new Error(`SRU HTTP ${res.status}`);
-  return res.text();
-}
-
-export interface Regeling {
-  bwbId: string;
-  titel: string;
-  type: string;
-  ministerie: string;
-  rechtsgebied: string;
-  geldigVanaf: string;
-  geldigTot: string;
-  gewijzigd: string;
-  repositoryUrl: string;
-}
-
-export function parseRecords(xml: string): Regeling[] {
-  const parsed = parser.parse(xml);
-  const root = parsed?.["searchRetrieveResponse"] ?? {};
-  const records: unknown[] = root?.["records"]?.["record"] ?? [];
-  const recordsArray = Array.isArray(records) ? records : (records ? [records] : []);
-
-  return recordsArray.map((rec: unknown) => {
-    const r = rec as Record<string, unknown>;
-    const gzd = (r?.["recordData"] as Record<string, unknown>)?.["gzd"] as Record<string, unknown> ?? {};
-    const original = (gzd?.["originalData"] as Record<string, unknown>) ?? {};
-    const meta = (original?.["overheidbwb:meta"] as Record<string, unknown>) ?? {};
-    const owmskern = (meta?.["owmskern"] as Record<string, unknown>) ?? {};
-    const bwbipm = (meta?.["bwbipm"] as Record<string, unknown>) ?? {};
-    const enrich = (gzd?.["enrichedData"] as Record<string, unknown>) ?? {};
-
-    const bwbId = String(owmskern?.["dcterms:identifier"] ?? "");
-    const rechtsgebied = bwbipm?.["overheidbwb:rechtsgebied"];
-    const rechtsgebiedStr = Array.isArray(rechtsgebied)
-      ? rechtsgebied.join(", ")
-      : String(rechtsgebied ?? "");
-
-    return {
-      bwbId,
-      titel: String(owmskern?.["dcterms:title"] ?? ""),
-      type: String(owmskern?.["dcterms:type"] ?? ""),
-      ministerie: String(owmskern?.["overheid:authority"] ?? ""),
-      rechtsgebied: rechtsgebiedStr,
-      geldigVanaf: String(bwbipm?.["overheidbwb:geldigheidsperiode_startdatum"] ?? ""),
-      geldigTot: String(bwbipm?.["overheidbwb:geldigheidsperiode_einddatum"] ?? "onbepaald"),
-      gewijzigd: String(owmskern?.["dcterms:modified"] ?? ""),
-      repositoryUrl: String(enrich?.["overheidbwb:locatie_toestand"] ?? `${REPO_BASE}/${bwbId}/`),
-    };
-  });
-}
-
-/**
- * Dedupliceert regelingen op BWB-id: behoudt per id alleen de versie met de
- * meest recente geldigVanaf-datum. Voorkomt dat historische versies van
- * dezelfde wet de resultaten overspoelen.
- */
-export function dedupliceerOpBwbId(lijst: Regeling[]): Regeling[] {
-  const map = new Map<string, Regeling>();
-  for (const r of lijst) {
-    const bestaande = map.get(r.bwbId);
-    if (!bestaande || r.geldigVanaf > bestaande.geldigVanaf) {
-      map.set(r.bwbId, r);
-    }
-  }
-  return Array.from(map.values());
-}
-
-export function formatRegelingen(lijst: Regeling[]): string {
-  if (!lijst.length) return "Geen regelingen gevonden.";
-  return lijst
-    .map(
-      (r, i) =>
-        `${i + 1}. **${r.titel || r.bwbId}**\n` +
-        `   BWB-id: \`${r.bwbId}\` | Type: ${r.type}\n` +
-        `   Ministerie: ${r.ministerie} | Rechtsgebied: ${r.rechtsgebied}\n` +
-        `   Geldig: ${r.geldigVanaf} – ${r.geldigTot} | Gewijzigd: ${r.gewijzigd}\n` +
-        `   URL: ${r.repositoryUrl}`
-    )
-    .join("\n\n");
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function escapeerRegex(str: string): string {
@@ -160,396 +81,182 @@ export function bouwTermPatroon(zoekterm: string): string {
   return `${pre}${kern}${post}`;
 }
 
-/**
- * Invoertype voor zoekTermInArtikelDom.
- * Een enkele RegExp wordt intern behandeld als OF-zoekopdracht met één patroon.
- */
-export type ZoekInput =
-  | RegExp
-  | { patronen: RegExp[]; operator: "EN" | "OF" };
-
-/**
- * Parseert een zoekterm met optionele EN/OF-operatoren naar een ZoekInput.
- * Elke deelterm wordt via bouwTermPatroon omgezet naar een regex met woordgrenzen en wildcards.
- * Voorbeeld: "aansprakelijk EN belasting" → operator EN, twee patronen.
- * AND en OR worden herkend als aliassen voor EN en OF.
- */
-export function parseZoekterm(zoekterm: string): ZoekInput {
-  const genormaliseerd = zoekterm.replace(/ AND /g, " EN ").replace(/ OR /g, " OF ");
-  if (genormaliseerd.includes(" EN ")) {
-    return {
-      operator: "EN",
-      patronen: genormaliseerd.split(" EN ").map(d => new RegExp(bouwTermPatroon(d.trim()), "gi")),
-    };
-  }
-  if (genormaliseerd.includes(" OF ")) {
-    return {
-      operator: "OF",
-      patronen: genormaliseerd.split(" OF ").map(d => new RegExp(bouwTermPatroon(d.trim()), "gi")),
-    };
-  }
-  return { operator: "OF", patronen: [new RegExp(bouwTermPatroon(genormaliseerd.trim()), "gi")] };
-}
-
-export function bouwJciUri(bwbId: string, artikel: string, lid?: string): string {
-  const base = `jci1.3:c:${bwbId}&artikel=${artikel}`;
-  return lid ? `${base}&lid=${lid}` : base;
-}
-
 export function stripXml(xml: string): string {
   return xml
-    .replace(/<\?xml[^>]*\?>/g, "")
-    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, "$1")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/\s{2,}/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-/**
- * Verwerkt raw `<al>`-content naar Markdown.
- * Zet inline markup om vóór stripXml: extref→link, intref→cursief, nadruk→vet/cursief.
- * Resterende onbekende tags worden door stripXml verwijderd.
- */
-export function renderAl(raw: string): string {
-  let result = String(raw);
-  // <extref doc="BWBR...">tekst</extref>  →  [tekst](BWBR...)
-  result = result.replace(
-    /<extref[^>]*\bdoc="([^"]+)"[^>]*>([\s\S]*?)<\/extref>/g,
-    (_, doc, inner) => `[${stripXml(inner)}](${doc})`
-  );
-  // <intref doc="jci...">tekst</intref>  →  [tekst](jci...)  of  *tekst* (geen doc)
-  result = result.replace(
-    /<intref([^>]*)>([\s\S]*?)<\/intref>/g,
-    (_, attrs: string, inner: string) => {
-      const docMatch = attrs.match(/\bdoc="([^"]+)"/);
-      return docMatch
-        ? `[${stripXml(inner)}](${docMatch[1]})`
-        : `*${stripXml(inner)}*`;
-    }
-  );
-  // <nadruk type="vet">  →  **vet**
-  result = result.replace(
-    /<nadruk[^>]*\btype="vet"[^>]*>([\s\S]*?)<\/nadruk>/g,
-    (_, inner) => `**${stripXml(inner)}**`
-  );
-  // <nadruk type="cur">  →  _cursief_
-  result = result.replace(
-    /<nadruk[^>]*\btype="cur"[^>]*>([\s\S]*?)<\/nadruk>/g,
-    (_, inner) => `_${stripXml(inner)}_`
-  );
-  return stripXml(result);
+function getElText(parent: XNode | null, tagName: string): string {
+  if (!parent) return "";
+  const el = parent.getElementsByTagName(tagName)[0];
+  return el?.textContent?.trim() ?? "";
 }
 
-// ── Artikel-extractie via DOM (BWB-toestand XSD) ────────────────────────────
+function getAttr(el: XNode | null, attrName: string): string {
+  if (!el) return "";
+  return el.getAttribute(attrName) ?? "";
+}
 
-// Extraheert de tekstwaarde van een <nr>-element.
-// fast-xml-parser levert: integer (25), float (24.1), string ("3:40", "22bis"),
-// of object met #text wanneer nr ook attributen heeft (bijv. status="officieel").
-function getNrValue(nr: unknown): string {
-  if (typeof nr === "number") return String(nr);
-  if (typeof nr === "string") return nr.trim();
-  if (typeof nr === "object" && nr !== null) {
-    const t = (nr as Record<string, unknown>)["#text"];
-    if (t != null) return String(t).trim();
+function extractTextForSearch(el: XNode): string {
+  if (el.nodeType === 3) return el.nodeValue ?? "";
+  if (el.nodeType !== 1) return "";
+  if (el.tagName === "kop") return "";
+
+  let text = "";
+  for (let i = 0; i < el.childNodes.length; i++) {
+    text += extractTextForSearch(el.childNodes.item(i));
   }
-  return "";
+  return text;
 }
 
-/**
- * Extraheert de tekstinhoud van een <al>-element.
- * fast-xml-parser levert voor stopNodes normaal een string (de rauwe inner-XML),
- * maar als <al> attributen heeft (bijv. status="...") dan een object { "#text": "...", "@_attr": "..." }.
- * String(object) geeft dan "[object Object]" — deze helper voorkomt dat.
- */
-export function getAlText(al: unknown): string {
-  if (typeof al === "string") return al;
-  if (typeof al === "number") return String(al);
-  if (typeof al === "object" && al !== null) {
-    const obj = al as Record<string, unknown>;
-    const text = obj["#text"];
-    if (text != null) return String(text);
+function zoekElementInDom(el: XNode, artikelnummer: string): XElement | null {
+  if (el.nodeType !== 1) return null;
+  const tag = el.tagName;
+
+  if (tag === "artikel" || tag === "circulaire.divisie") {
+    const nr = getElText(el.getElementsByTagName("kop")[0], "nr");
+    if (nr === artikelnummer) return el;
   }
-  return "";
-}
 
-/**
- * Splitst een artikelparameter in artikelnummer en optioneel lidnummer.
- * "9.1" → { artikelnr: "9", lidnr: "1" }
- * "25"  → { artikelnr: "25", lidnr: null }
- * "3:40" → { artikelnr: "3:40", lidnr: null }  (geen punt → geen lid)
- * "25.1" → { artikelnr: "25", lidnr: "1" }
- * Opmerking: Leidraad sub-artikelen ("25.1") worden eerst direct opgezocht;
- * pas als dat mislukt wordt de lid-interpretatie geprobeerd (zie wettenbank_artikel-handler).
- */
-export function parseerArtikelParam(artikel: string): { artikelnr: string; lidnr: string | null } {
-  const dotIdx = artikel.lastIndexOf(".");
-  if (dotIdx > 0) {
-    const maybeArtikel = artikel.slice(0, dotIdx);
-    const maybeLid = artikel.slice(dotIdx + 1);
-    if (/^\d+$/.test(maybeLid) && maybeArtikel.length > 0) {
-      return { artikelnr: maybeArtikel, lidnr: maybeLid };
-    }
-  }
-  return { artikelnr: artikel, lidnr: null };
-}
-
-interface ArtikelContext {
-  type: string; // "hoofdstuk" | "afdeling" | "paragraaf" | "deel" | "boek"
-  nr: string;
-  titel: string;
-}
-
-interface ArtikelMatch {
-  type: "artikel" | "circulaire.divisie";
-  node: Record<string, unknown>;
-  context: ArtikelContext[]; // ancestor-keten, buitenste eerst
-}
-
-// Zoekt recursief een artikel-node op basis van artikelnummer.
-// Structurele containers (wettekst, hoofdstuk, paragraaf, …) worden doorzocht;
-// artikel en circulaire.divisie worden gecontroleerd én doorzocht (voor geneste artikelen).
-// Ancestor-keten wordt opgebouwd voor containers met een kop (nr/titel).
-function zoekArtikelInDom(
-  node: Record<string, unknown>,
-  artikelnummer: string,
-  depth = 0,
-  ancestors: ArtikelContext[] = []
-): ArtikelMatch | null {
-  // Voorkom stack overflow bij extreem geneste of malformed XML
-  if (depth > 30) return null;
-  for (const key of ["artikel", "circulaire.divisie"] as const) {
-    const items = node[key] as Record<string, unknown>[] | undefined;
-    if (!Array.isArray(items)) continue;
-    for (const item of items) {
-      const kop = item.kop as Record<string, unknown> | undefined;
-      if (kop && getNrValue(kop.nr) === artikelnummer) {
-        return { type: key, node: item, context: ancestors };
-      }
-      const found = zoekArtikelInDom(item, artikelnummer, depth + 1, ancestors);
-      if (found) return found;
-    }
-  }
-  // Structurele containers met ancestor-tracking voor nodes met kop
-  const structuurContainers = ["boek", "deel", "hoofdstuk", "afdeling", "paragraaf"] as const;
-  const overigeContainers = ["toestand", "wettekst", "wet-besluit", "wetgeving", "circulaire", "circulaire-tekst", "tekst"] as const;
-  for (const key of [...structuurContainers, ...overigeContainers]) {
-    const val = node[key];
-    if (!val) continue;
-    const list = Array.isArray(val)
-      ? (val as Record<string, unknown>[])
-      : [val as Record<string, unknown>];
-    for (const child of list) {
-      let childAncestors = ancestors;
-      if ((structuurContainers as readonly string[]).includes(key)) {
-        const kop = child.kop as Record<string, unknown> | undefined;
-        if (kop) {
-          const nr = getNrValue(kop.nr);
-          const titel = getNrValue(kop.titel); // getNrValue handles {#text, @_status} objects
-          if (nr || titel) {
-            childAncestors = [...ancestors, { type: key, nr, titel }];
-          }
-        }
-      }
-      const found = zoekArtikelInDom(child, artikelnummer, depth + 1, childAncestors);
-      if (found) return found;
-    }
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const found = zoekElementInDom(el.childNodes.item(i), artikelnummer);
+    if (found) return found;
   }
   return null;
 }
 
-function formatLijst(lijst: Record<string, unknown>, diepte = 0): string[] {
-  const indent = "   ".repeat(diepte + 1);
-  const items = Array.isArray(lijst.li) ? lijst.li : (lijst.li ? [lijst.li] : []);
-  const lines: string[] = [];
-  for (const li of items as Record<string, unknown>[]) {
-    const linr = li["li.nr"] != null ? getNrValue(li["li.nr"]) : "";
-    const al = li.al != null ? renderAl(getAlText(li.al)) : "";
-    lines.push(`${indent}${linr} ${al}`.trimEnd());
-    // Geneste <lijst> binnen <li> (bijv. sub-onderdelen 1°, 2°)
-    if (li.lijst) {
-      const sublijsten = Array.isArray(li.lijst) ? li.lijst : [li.lijst];
-      for (const sub of sublijsten as Record<string, unknown>[]) {
-        lines.push(...formatLijst(sub, diepte + 1));
-      }
-    }
-  }
-  return lines;
+// ── SRU & Repository Clients ──────────────────────────────────────────────────
+
+export interface Regeling {
+  bwbId: string;
+  titel: string;
+  type: string;
+  ministerie: string;
+  rechtsgebied: string;
+  geldigVanaf: string;
+  geldigTot: string;
+  gewijzigd: string;
+  repositoryUrl: string;
 }
 
-function formatLidNode(lid: Record<string, unknown>, parts: string[], artikelnr?: string): void {
-  const lidnr = lid.lidnr != null ? getNrValue(lid.lidnr) : "";
-  // Gebruik "9.1" notatie wanneer het artikelnummer bekend is, anders "1."
-  const prefix = lidnr ? (artikelnr ? `${artikelnr}.${lidnr}  ` : `${lidnr}.  `) : "";
-  if (lid.al != null) {
-    const als = Array.isArray(lid.al) ? lid.al : [lid.al];
-    als.forEach((al, i) => parts.push((i === 0 ? prefix : "      ") + renderAl(getAlText(al))));
-  }
-  if (lid.lijst) {
-    const lijsten = Array.isArray(lid.lijst) ? lid.lijst : [lid.lijst];
-    for (const l of lijsten as Record<string, unknown>[]) parts.push(...formatLijst(l));
-  }
-}
-
-function formateerArtikelNode(
-  match: ArtikelMatch,
-  lidFilter?: string
-): { tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } {
-  const { node, context } = match;
-  const kop = node.kop as Record<string, unknown> | undefined;
-  const nr = kop ? getNrValue(kop.nr) : "";
-  const titel = kop?.titel != null ? getNrValue(kop.titel) : "";
-
-  // Structuurpad: ancestor-keten als array van strings (los van de artikeltekst)
-  const structuurpad = context.map(c => {
-    const label = c.type.charAt(0).toUpperCase() + c.type.slice(1);
-    const cnr   = c.nr    ? ` ${c.nr}`    : "";
-    const ctitel = c.titel ? ` — ${c.titel}` : "";
-    return `${label}${cnr}${ctitel}`;
+export async function sruRequest(query: string, maxRecords = 10): Promise<string> {
+  const params = new URLSearchParams({
+    operation: "searchRetrieve",
+    version: "2.0",
+    "x-connection": "BWB",
+    query,
+    maximumRecords: String(maxRecords),
   });
+  const res = await fetch(`${SRU_BASE}?${params}`, { headers: { Accept: "application/xml" } });
+  if (!res.ok) throw new Error(`SRU HTTP ${res.status}`);
+  return res.text();
+}
 
-  // Artikeltekst: kop + inhoud, zonder de structuurpad-regels
-  const parts: string[] = [];
-  parts.push(titel ? `Artikel ${nr} ${titel}` : `Artikel ${nr}`);
-  const ledenArray: { lid: string; tekst: string }[] = [];
+export function parseRecords(xml: string): Regeling[] {
+  const doc = domParser.parseFromString(xml, "text/xml");
+  const records = Array.from(doc.getElementsByTagName("record"));
 
-  if (lidFilter) {
-    // Toon alleen het gevraagde lid
-    if (Array.isArray(node.lid)) {
-      const gevondenLid = (node.lid as Record<string, unknown>[]).find(lid => {
-        const lidnr = lid.lidnr != null ? getNrValue(lid.lidnr) : "";
-        return lidnr === lidFilter;
-      });
-      if (gevondenLid) {
-        const lidParts: string[] = [];
-        formatLidNode(gevondenLid, lidParts, nr);
-        parts.push(...lidParts);
-        ledenArray.push({ lid: lidFilter, tekst: lidParts.join("\n").trim() });
-      } else {
-        parts.push(`(Lid ${lidFilter} niet gevonden in dit artikel)`);
-      }
-    } else {
-      parts.push(`(Dit artikel heeft geen genummerde leden)`);
-    }
-    return { tekst: parts.join("\n").trim(), structuurpad, leden: ledenArray };
-  }
+  return records.map((rec) => {
+    const gzd = rec.getElementsByTagName("gzd")[0];
+    const owmskern = gzd?.getElementsByTagName("owmskern")[0];
+    const bwbipm = gzd?.getElementsByTagName("bwbipm")[0];
+    const enrich = gzd?.getElementsByTagName("enrichedData")[0];
 
-  // Directe <al> (artikel zonder lid, of preamble-tekst boven lid-lijst)
-  if (node.al != null) {
-    const als = Array.isArray(node.al) ? node.al : [node.al];
-    for (const al of als) parts.push(renderAl(getAlText(al)));
-  }
+    const bwbId = getElText(owmskern, "dcterms:identifier");
+    const rgEls = bwbipm ? Array.from(bwbipm.getElementsByTagName("overheidbwb:rechtsgebied")) : [];
+    const rechtsgebiedStr = rgEls.map(e => e.textContent?.trim()).filter(Boolean).join(", ");
 
-  // <lijst> direct in artikel zonder lid (XSD: structuur.maximaal in artikel)
-  if (node.lijst && !node.lid) {
-    const lijsten = Array.isArray(node.lijst) ? node.lijst : [node.lijst];
-    for (const l of lijsten as Record<string, unknown>[]) parts.push(...formatLijst(l));
-  }
+    return {
+      bwbId,
+      titel: getElText(owmskern, "dcterms:title"),
+      type: getElText(owmskern, "dcterms:type"),
+      ministerie: getElText(owmskern, "overheid:authority"),
+      rechtsgebied: rechtsgebiedStr,
+      geldigVanaf: getElText(bwbipm, "overheidbwb:geldigheidsperiode_startdatum"),
+      geldigTot: getElText(bwbipm, "overheidbwb:geldigheidsperiode_einddatum") || "onbepaald",
+      gewijzigd: getElText(owmskern, "dcterms:modified"),
+      repositoryUrl: getElText(enrich, "overheidbwb:locatie_toestand") || `${REPO_BASE}/${bwbId}/`,
+    };
+  });
+}
 
-  // <lid> elementen (XSD: class.lid — bevat lidnr + structuur.maximaal*)
-  if (Array.isArray(node.lid)) {
-    for (const lid of node.lid as Record<string, unknown>[]) {
-      const lidnr = lid.lidnr != null ? getNrValue(lid.lidnr) : "";
-      const lidParts: string[] = [];
-      formatLidNode(lid, lidParts, nr);
-      parts.push(...lidParts);
-      ledenArray.push({ lid: lidnr, tekst: lidParts.join("\n").trim() });
+export function dedupliceerOpBwbId(lijst: Regeling[]): Regeling[] {
+  const map = new Map<string, Regeling>();
+  for (const r of lijst) {
+    const bestaande = map.get(r.bwbId);
+    if (!bestaande || r.geldigVanaf > bestaande.geldigVanaf) {
+      map.set(r.bwbId, r);
     }
   }
-
-  // <tekst> blok (XSD: class.circulaire-tekst — hoofdtekst van circulaire.divisie)
-  if (node.tekst) {
-    const tekst = node.tekst as Record<string, unknown>;
-    const als = Array.isArray(tekst.al) ? tekst.al : (tekst.al ? [tekst.al] : []);
-    for (const al of als) parts.push(renderAl(getAlText(al)));
-  }
-
-  // Als er geen genummerde leden zijn maar wel inhoud (bijv. circulaire.divisie of artikel met
-  // alleen directe <al>), geef de volledige tekst als één entry zonder lidnummer.
-  if (ledenArray.length === 0 && parts.length > 1) {
-    ledenArray.push({ lid: "", tekst: parts.slice(1).join("\n").trim() });
-  }
-
-  return { tekst: parts.join("\n").trim(), structuurpad, leden: ledenArray };
+  return Array.from(map.values());
 }
 
-/**
- * Extraheert één artikel uit de ruwe BWB-toestand XML via DOM-traversal.
- * Gebruikt fast-xml-parser met configuratie afgeleid van toestand_base_2016-1.xsd.
- * Ondersteunt zowel <artikel> (reguliere wetten) als <circulaire.divisie> (Leidraad).
- * Fallback: extraheerArtikel() op de gesripte tekst.
- */
-export function extraheerArtikelUitXml(
-  rawXml: string,
-  artikelnummer: string,
-  lidFilter?: string
-): { tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null {
-  try {
-    const dom = wetParser.parse(rawXml) as Record<string, unknown>;
-    const found = zoekArtikelInDom(dom, artikelnummer);
-    if (!found) return null;
-    return formateerArtikelNode(found, lidFilter);
-  } catch {
-    return null;
+export interface WetstekstResultaat {
+  rawXml: string;
+  doc: XDocument;
+  regeling: Regeling;
+}
+
+export async function haalWetstekstOp(
+  bwbId: string,
+  peildatum?: string
+): Promise<WetstekstResultaat> {
+  const datum = peildatum ?? vandaag();
+  const cacheKey = getCacheKey(bwbId, datum);
+  const cached = xmlCache.get(cacheKey);
+
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    return { rawXml: cached.rawXml, doc: cached.doc, regeling: cached.regeling };
   }
-}
 
-/**
- * Controleert de `@_status` van een artikel-node.
- * Geeft een waarschuwingsstring terug als het artikel niet de status "goed" of "geldend" heeft.
- */
-export function detecteerArtikelStatus(rawXml: string, artikelnummer: string): string | null {
-  if (!rawXml) return null;
-  try {
-    const dom = wetParser.parse(rawXml) as Record<string, unknown>;
-    const found = zoekArtikelInDom(dom, artikelnummer);
-    if (!found) return null;
-    const status = (found.node["@_status"] as string | undefined) ?? "";
-    if (status && status !== "goed" && status !== "geldend") {
-      return `Artikel heeft status "${status}"`;
-    }
-    return null;
-  } catch {
-    return null;
+  const sruXml = await sruRequest(`dcterms.identifier==${bwbId} and overheidbwb.geldigheidsdatum==${datum}`, 1);
+  const lijst = parseRecords(sruXml);
+  if (!lijst.length) {
+    throw new Error(`Geen regeling gevonden voor BWB-id: ${bwbId} op datum ${datum}.`);
   }
+  const r = lijst[0];
+
+  const resp = await fetch(r.repositoryUrl);
+  if (!resp.ok) throw new Error(`Wetstekst repository onbereikbaar: ${resp.status}`);
+  
+  const rawXml = await resp.text();
+  const doc = domParser.parseFromString(rawXml, "text/xml");
+
+  const result = { rawXml, doc, regeling: r };
+  xmlCache.set(cacheKey, { ...result, timestamp: Date.now() });
+  
+  return result;
 }
 
-// ── Zoekterm via DOM (wettenbank_zoekterm) ────────────────────────────────────
+// ── Metadata & Zoek Logica ────────────────────────────────────────────────────
 
-// Bescherming tegen explosieve zoektermen (bijv. *term* op groot document)
-const MAX_TREFFERS_PER_ARTIKEL = 100;
-const MAX_TREFFERS_TOTAAL = 2000;
-
-export interface TermTreffer {
-  artikelnummer: string;
-  aantalTreffers: number;
-  leden: string[];
+export interface DocMetadata {
+  citeertitel: string;
+  versiedatum: string;
 }
+
+export function extraheerDocMetadata(doc: XDocument): DocMetadata {
+  const toestand = doc.getElementsByTagName("toestand")[0];
+  const versiedatum = toestand ? getAttr(toestand, "inwerkingtredingsdatum") : "";
+  const regelingInfo = doc.getElementsByTagName("regeling-info")[0];
+  const citeertitel = regelingInfo ? getElText(regelingInfo, "citeertitel") : "";
+  return { citeertitel, versiedatum };
+}
+
+export type ZoekInput =
+  | RegExp
+  | { patronen: RegExp[]; operator: "EN" | "OF" };
 
 export interface ZoekTermResultaat {
-  artikelen: TermTreffer[];
-  /** true = volledige scan uitgevoerd; false = gestopt bij maxResultaten (toekomstig: SAX) */
+  artikelen: { artikelnummer: string; aantalTreffers: number; leden: string[] }[];
+  totaalTreffers: number;
   isVolledig: boolean;
-  /** Som van alle treffers over alle gevonden artikelen (null wanneer isVolledig=false) */
-  totaalTreffers: number | null;
 }
 
-/**
- * Zoekt een term (of meerdere termen via EN/OF) in alle artikel-nodes van de geparsde DOM.
- * Accepteert een enkele RegExp (backward-compatible) of een ZoekInput met operator.
- * - OF: artikel wordt opgenomen als ≥1 patroon matcht (som van alle treffers).
- * - EN: artikel wordt opgenomen als ALLE patronen minstens één keer voorkomen in dat artikel.
- * Artikel-grenzen komen uit de XML-structuur, niet uit tekstpatronen.
- */
 export function zoekTermInArtikelDom(
-  dom: Record<string, unknown>,
+  doc: XDocument | XElement,
   invoer: ZoekInput,
   maxResultaten = 10
 ): ZoekTermResultaat {
@@ -560,92 +267,39 @@ export function zoekTermInArtikelDom(
   const tellers = new Map<string, { count: number; leden: Set<string>; matchedPatterns: Set<number> }>();
   let totaalTreffersTeller = 0;
 
-  function tel(nr: string, tekst: string, lidnr?: string): void {
-    if (totaalTreffersTeller >= MAX_TREFFERS_TOTAAL) return;
-    const entry = tellers.get(nr) ?? { count: 0, leden: new Set<string>(), matchedPatterns: new Set<number>() };
-    if (entry.count >= MAX_TREFFERS_PER_ARTIKEL) return;
+  const articles: XElement[] = [
+    ...Array.from(doc.getElementsByTagName("artikel")),
+    ...Array.from(doc.getElementsByTagName("circulaire.divisie"))
+  ];
 
-    const clean = stripXml(tekst);
+  for (const art of articles) {
+    const nr = getElText(art.getElementsByTagName("kop")[0], "nr");
+    if (!nr) continue;
+
+    const entry = tellers.get(nr) ?? { count: 0, leden: new Set<string>(), matchedPatterns: new Set<number>() };
+    const clean = extractTextForSearch(art);
+    
     patronen.forEach((pat, i) => {
-      const m = clean.match(pat);
-      if (m) {
-        const toAdd = Math.min(m.length, MAX_TREFFERS_PER_ARTIKEL - entry.count);
+      const matches = clean.match(pat);
+      if (matches) {
+        const toAdd = Math.min(matches.length, 100 - entry.count);
         entry.count += toAdd;
         totaalTreffersTeller += toAdd;
         entry.matchedPatterns.add(i);
-        if (lidnr != null) entry.leden.add(lidnr);
         tellers.set(nr, entry);
       }
     });
-  }
 
-  // Doorzoekt een <lijst>-node recursief (inclusief geneste sub-lijsten).
-  function telInLijst(lijst: Record<string, unknown>, nr: string, lidnr?: string): void {
-    const items = Array.isArray(lijst.li) ? lijst.li : (lijst.li ? [lijst.li] : []);
-    for (const li of items as Record<string, unknown>[]) {
-      if (li.al != null) tel(nr, getAlText(li.al), lidnr);
-      if (li.lijst) {
-        const sublijsten = Array.isArray(li.lijst) ? li.lijst : [li.lijst];
-        for (const sub of sublijsten as Record<string, unknown>[]) telInLijst(sub, nr, lidnr);
+    const lids = Array.from(art.getElementsByTagName("lid"));
+    for (const lid of lids) {
+      const lidnr = getElText(lid, "lidnr");
+      if (!lidnr) continue;
+      const lidText = extractTextForSearch(lid);
+      if (patronen.some(pat => pat.test(lidText))) {
+        entry.leden.add(lidnr);
       }
     }
   }
-
-  function telInArtikelNode(node: Record<string, unknown>, nr: string): void {
-    // Directe <al>
-    if (node.al != null) {
-      const als = Array.isArray(node.al) ? node.al : [node.al];
-      for (const al of als) tel(nr, getAlText(al));
-    }
-    // Directe <lijst> (artikel zonder lid)
-    if (node.lijst) {
-      const lijsten = Array.isArray(node.lijst) ? node.lijst : [node.lijst];
-      for (const lijst of lijsten as Record<string, unknown>[]) telInLijst(lijst, nr);
-    }
-    // <lid> elementen
-    if (Array.isArray(node.lid)) {
-      for (const lid of node.lid as Record<string, unknown>[]) {
-        const lidnr = lid.lidnr != null ? getNrValue(lid.lidnr) : undefined;
-        if (lid.al != null) {
-          const als = Array.isArray(lid.al) ? lid.al : [lid.al];
-          for (const al of als) tel(nr, getAlText(al), lidnr);
-        }
-        if (lid.lijst) {
-          const lijsten = Array.isArray(lid.lijst) ? lid.lijst : [lid.lijst];
-          for (const lijst of lijsten as Record<string, unknown>[]) telInLijst(lijst, nr, lidnr);
-        }
-      }
-    }
-    // <tekst> blok (circulaire.divisie)
-    if (node.tekst) {
-      const tekst = node.tekst as Record<string, unknown>;
-      const als = Array.isArray(tekst.al) ? tekst.al : (tekst.al ? [tekst.al] : []);
-      for (const al of als) tel(nr, getAlText(al));
-    }
-  }
-
-  function traverseer(node: Record<string, unknown>, depth = 0): void {
-    if (depth > 30) return;
-    for (const key of ["artikel", "circulaire.divisie"] as const) {
-      const items = node[key] as Record<string, unknown>[] | undefined;
-      if (!Array.isArray(items)) continue;
-      for (const item of items) {
-        const kop = item.kop as Record<string, unknown> | undefined;
-        const nr = kop ? getNrValue(kop.nr) : "";
-        if (nr) telInArtikelNode(item, nr);
-        traverseer(item, depth + 1);
-      }
-    }
-    for (const key of ["toestand", "boek", "deel", "hoofdstuk", "afdeling", "paragraaf",
-                       "wettekst", "wet-besluit", "wetgeving", "circulaire", "circulaire-tekst", "tekst"] as const) {
-      const val = (node as Record<string, unknown>)[key];
-      if (!val) continue;
-      const list = Array.isArray(val) ? val as Record<string, unknown>[] : [val as Record<string, unknown>];
-      for (const child of list) traverseer(child, depth + 1);
-    }
-  }
-
-  traverseer(dom);
 
   const alleArtikelen = Array.from(tellers.entries())
     .filter(([, { matchedPatterns }]) =>
@@ -654,7 +308,11 @@ export function zoekTermInArtikelDom(
     .map(([artikelnummer, { count, leden }]) => ({
       artikelnummer,
       aantalTreffers: count,
-      leden: Array.from(leden).sort((a, b) => parseFloat(a) - parseFloat(b)),
+      leden: Array.from(leden).sort((a, b) => {
+        const nA = parseFloat(a), nB = parseFloat(b);
+        if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+        return a.localeCompare(b);
+      }),
     }))
     .sort((a, b) => {
       const nA = parseFloat(a.artikelnummer), nB = parseFloat(b.artikelnummer);
@@ -662,143 +320,30 @@ export function zoekTermInArtikelDom(
       return a.artikelnummer.localeCompare(b.artikelnummer);
     });
 
-  // Totaal over alle gevonden artikelen (vóór maxResultaten-afkap)
-  const totaalTreffers = alleArtikelen.reduce((s, t) => s + t.aantalTreffers, 0);
-  // DOM scant altijd het volledige document; isVolledig is altijd true
-  // (bij toekomstige SAX-implementatie kan dit false worden bij early exit)
-  const isVolledig = true;
-  const artikelen = alleArtikelen.slice(0, maxResultaten);
-
-  return { artikelen, isVolledig, totaalTreffers };
+  return {
+    artikelen: alleArtikelen.slice(0, maxResultaten),
+    totaalTreffers: alleArtikelen.reduce((s, t) => s + t.aantalTreffers, 0),
+    isVolledig: true,
+  };
 }
 
-/**
- * Extraheert één artikel uit de platte wetstekst op basis van het artikelnummer.
- * Werkt op de output van stripXml(). Ondersteunt zowel "3:40" (Awb) als "25" (IW 1990).
- * Strips ook de trailing publicatiemetadata (datums/nummers).
- * Fallback voor als extraheerArtikelUitXml geen resultaat geeft.
- */
-export function extraheerArtikel(tekst: string, artikelnummer: string): string | null {
-  const escaped = escapeerRegex(artikelnummer);
-  const parts = tekst.split(/(?=Artikel \d)/);
-  const match = parts.find(p => new RegExp(`^Artikel ${escaped}[\\s\\t]`).test(p));
-  if (!match) return null;
-  // Strip trailing publicatiemetadata: reeks jaar/volgnr/datum-patronen
-  return match.replace(/\s*\d{4}\s+\d+\s+\d{2}-\d{2}-\d{4}.*$/s, "").trim();
+export function parseZoekterm(zoekterm: string): ZoekInput {
+  let t = zoekterm.replace(/ AND /g, " EN ").replace(/ OR /g, " OF ");
+  const op = t.includes(" EN ") ? "EN" : "OF";
+  const parts = t.split(op === "EN" ? " EN " : " OF ").map(p => p.trim());
+  const regexify = (s: string) => {
+    const kern = s.replace(/\*/g, "");
+    const pre = s.startsWith("*") ? "\\w*" : "\\b";
+    const post = s.endsWith("*") ? "\\w*" : "\\b";
+    return new RegExp(`${pre}${kern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${post}`, "gi");
+  };
+  return { patronen: parts.map(regexify), operator: op };
 }
 
-/**
- * Zoekt het dichtstbijzijnde "Artikel X" vóór een matchpositie in de tekst.
- * Geeft de artikelkop terug (bijv. "Artikel 9") of een lege string als niet gevonden.
- */
-export function vindArtikelContext(tekst: string, matchIndex: number): string {
-  const artikelRegex = /Artikel\s+[\d:]+[a-z]*/gi;
-  let dichtbijste = "";
-  let dichtbijsteAfstand = Infinity;
-  for (const m of tekst.matchAll(artikelRegex)) {
-    if (m.index !== undefined && m.index <= matchIndex) {
-      const afstand = matchIndex - m.index;
-      if (afstand < dichtbijsteAfstand) {
-        dichtbijsteAfstand = afstand;
-        dichtbijste = m[0];
-      }
-    }
-  }
-  return dichtbijste;
-}
-
-export interface DocMetadata {
-  citeertitel: string;
-  versiedatum: string;
-}
-
-/**
- * Haalt `citeertitel` en `inwerkingtredingsdatum` op uit de geparsde BWB-toestand DOM.
- * Root-element is `<toestand inwerkingtredingsdatum="...">` met `<wetgeving><wet-besluit><regeling-info>`.
- * Geeft lege strings terug als de paden niet bestaan (caller valt terug op SRU-metadata).
- */
-export function extraheerDocMetadata(dom: Record<string, unknown>): DocMetadata {
-  const toestand = dom["toestand"] as Record<string, unknown> | undefined;
-  const versiedatum = String(toestand?.["@_inwerkingtreding"] ?? "");
-  const wetgeving = toestand?.["wetgeving"] as Record<string, unknown> | undefined;
-  const wetBesluit = wetgeving?.["wet-besluit"] as Record<string, unknown> | undefined;
-  const regelingInfo = wetBesluit?.["regeling-info"] as Record<string, unknown> | undefined;
-  const citeertitel = regelingInfo ? getNrValue(regelingInfo["citeertitel"]) : "";
-  return { citeertitel, versiedatum };
-}
-
-export interface WetstekstResultaat {
-  formatted: string;
-  inhoud: string;
-  rawXml: string;
-  regeling: Regeling;
-}
-
-export async function haalWetstekstOp(
-  bwbId: string,
-  peildatum?: string
-): Promise<WetstekstResultaat> {
-  const datum = peildatum ?? vandaag();
-  const xml = await sruRequest(`dcterms.identifier==${bwbId} and overheidbwb.geldigheidsdatum==${datum}`, 1);
-  const lijst = parseRecords(xml);
-  if (!lijst.length) {
-    throw new Error(
-      `Geen regeling voor BWB-id: ${bwbId}. ` +
-      `Gebruik wettenbank_zoek(titel=..., regelingsoort="wet") om het juiste BWB-id te vinden. ` +
-      `Bekende ids: ${KERNWET_IDS}.`
-    );
-  }
-  const r = lijst[0];
-
-  let rawXml = "";
-  let inhoud = "";
-  try {
-    const resp = await fetch(r.repositoryUrl);
-    if (resp.ok) {
-      rawXml = await resp.text();
-      inhoud = stripXml(rawXml);
-    } else {
-      inhoud = `(Wetstekst niet bereikbaar: ${resp.status})`;
-    }
-  } catch {
-    inhoud = "(Fout bij ophalen wetstekst)";
-  }
-
-  const formatted = [
-    `**${r.titel}** (${r.bwbId}) — geldig per ${datum}`,
-    "",
-    inhoud || "(Geen wetstekst beschikbaar)",
-  ].join("\n");
-
-  return { formatted, inhoud: inhoud || "", rawXml, regeling: r };
-}
-
-// ── BWB-structuur helpers ─────────────────────────────────────────────────────
-
-import type { BwbNode } from "./bwb-parser/index.js";
-
-/**
- * Zoekt recursief in een BwbNode-boom naar het eerste artikel-node
- * met het opgegeven artikelnummer (via metadata.nr).
- */
-function zoekNodeInBoom(node: BwbNode, artikelnummer: string): BwbNode | null {
-  if (
-    (node.type === "artikel" || node.type === "circulaire_divisie") &&
-    node.metadata.nr === artikelnummer
-  ) {
-    return node;
-  }
-  for (const child of node.children) {
-    const found = zoekNodeInBoom(child, artikelnummer);
-    if (found) return found;
-  }
-  return null;
-}
-
-// ── Server ───────────────────────────────────────────────────────────────────
+// ── MCP Server setup ─────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "wettenbank-mcp", version: "1.0.0" },
+  { name: "wettenbank-mcp", version: "2.1.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -806,325 +351,143 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "wettenbank_zoek",
-      description:
-        "Zoek Nederlandse regelingen in het Basiswettenbestand (wetten.overheid.nl) op naam en retourneer BWB-id + metadata. " +
-        "Gebruik 'titel' om wetten op te zoeken (bijv. 'Invorderingswet'). " +
-        "Filter optioneel op rechtsgebied (belastingrecht, bestuursrecht), ministerie of regelingsoort. " +
-        "Optioneel: peildatum (YYYY-MM-DD) om te zoeken naar de versie geldig op die datum; default is vandaag. " +
-        "Kernwet-ids zijn al bekend: IW 1990 → BWBR0004770 | AWR → BWBR0002320 | Awb → BWBR0005537 | Leidraad 2008 → BWBR0024096.",
+      description: "Zoek Nederlandse regelingen op naam en retourneer BWB-id + metadata.",
       inputSchema: {
         type: "object",
         properties: {
           titel: { type: "string", description: "Zoekterm in de titel, bijv. 'Invorderingswet'" },
           rechtsgebied: { type: "string", description: "bijv. belastingrecht, arbeidsrecht" },
           ministerie: { type: "string", description: "bijv. Financiën, Justitie" },
-          regelingsoort: {
-            type: "string",
-            enum: ["wet", "AMvB", "ministeriele-regeling", "regeling", "besluit"],
-          },
+          regelingsoort: { type: "string", enum: ["wet", "AMvB", "ministeriele-regeling", "regeling", "besluit"] },
           maxResultaten: { type: "number", default: 10 },
-          peildatum: { type: "string", description: "Datum YYYY-MM-DD; retourneert versie geldig op die datum. Default is vandaag." },
+          peildatum: { type: "string", description: "Datum YYYY-MM-DD; default is vandaag." },
         },
       },
     },
     {
       name: "wettenbank_artikel",
-      description:
-        "Haal één artikel op uit een Nederlandse wet (één artikel per aanroep). " +
-        "Voor meerdere artikelen: roep deze tool parallel aan per artikel. " +
-        "Kernwet-ids: IW 1990 → BWBR0004770 | AWR → BWBR0002320 | Awb → BWBR0005537 | Leidraad 2008 → BWBR0024096. " +
-        "Optioneel: peildatum (YYYY-MM-DD) voor een historische versie; default is vandaag. " +
-        "De response bevat boven de artikelkop één of meer structuurregels (bijv. 'Hoofdstuk II — titel'), elk op een eigen regel. " +
-        "Geeft expliciet aan als het artikel niet gevonden is.",
+      description: "Haal één artikel op uit een Nederlandse wet in schone Markdown.",
       inputSchema: {
         type: "object",
         required: ["bwbId", "artikel"],
         properties: {
-          bwbId: { type: "string", description: "BWB-id, bijv. BWBR0004770 (IW 1990)" },
-          artikel: {
-            type: "string",
-            description: "Artikelnummer, bijv. '25' (IW 1990), '3:40' (Awb) of '25.1' (Leidraad sub-artikel).",
-          },
-          lid: {
-            type: "string",
-            description: "Lidnummer om één specifiek lid op te vragen, bijv. '1'. Leeg laten voor het hele artikel.",
-          },
-          peildatum: { type: "string", description: "Datum YYYY-MM-DD voor historische versie; default is vandaag." },
+          bwbId: { type: "string", description: "BWB-id, bijv. BWBR0004770" },
+          artikel: { type: "string", description: "Artikelnummer, bijv. '25' of '3:40'." },
+          lid: { type: "string", description: "Optioneel lidnummer." },
+          peildatum: { type: "string", description: "Datum YYYY-MM-DD; default is vandaag." },
         },
       },
     },
     {
       name: "wettenbank_zoekterm",
-      description:
-        "Zoek welke artikelen een begrip bevatten in één Nederlandse wet (één BWB-id per aanroep). " +
-        "Voor meerdere wetten: roep deze tool parallel aan per BWB-id. " +
-        "Retourneert een lijst van artikelnummers met treffertellingen en directe aanroepvoorbeelden voor wettenbank_artikel. " +
-        "Wildcards: 'termijn*' (begint met), '*termijn' (eindigt op), '*termijn*' (bevat). " +
-        "Zonder wildcard: exacte woordmatch ('termijn' matcht NIET 'termijnen'). " +
-        "Operatoren: 'aansprakelijk EN belasting' of 'aansprakelijk AND belasting' (beide aanwezig), 'uitstel OF afstel' of 'uitstel OR afstel' (minstens één). " +
-        "Geeft expliciet aan als de term nergens gevonden is. " +
-        "Optioneel: peildatum (YYYY-MM-DD) voor een historische versie; default is vandaag.",
+      description: "Zoek welke artikelen een begrip bevatten in één Nederlandse wet.",
       inputSchema: {
         type: "object",
         required: ["bwbId", "zoekterm"],
         properties: {
-          bwbId: { type: "string", description: "BWB-id, bijv. BWBR0004770 (IW 1990)" },
-          zoekterm: {
-            type: "string",
-            description:
-              "Te zoeken begrip. Zonder wildcard: exacte woordmatch. " +
-              "Wildcards: 'termijn*' (begint met), '*termijn' (eindigt op), '*termijn*' (bevat). " +
-              "Operatoren: 'aansprakelijk EN belasting' of 'aansprakelijk AND belasting' (beide aanwezig in artikel), 'uitstel OF afstel' of 'uitstel OR afstel' (minstens één).",
-          },
-          peildatum: { type: "string", description: "Datum YYYY-MM-DD voor historische versie; default is vandaag." },
-          maxResultaten: {
-            type: "number",
-            description: "Maximum aantal artikelen in de uitvoer (standaard: 10, maximum: 50). Gebruik een hogere waarde om meer vindplaatsen te zien.",
-          },
+          bwbId: { type: "string", description: "BWB-id, bijv. BWBR0004770" },
+          zoekterm: { type: "string", description: "Te zoeken begrip (EN/OF operators toegestaan)." },
+          peildatum: { type: "string", description: "Datum YYYY-MM-DD." },
+          maxResultaten: { type: "number", default: 10 },
         },
       },
     },
   ],
 }));
 
-/**
- * Zoekt een artikel- of circulaire.divisie element in de @xmldom boom.
- */
-function zoekElementInDom(el: any, artikelnummer: string): any | null {
-  const tag = el.tagName;
-  if (tag === "artikel" || tag === "circulaire.divisie") {
-    // Check kop > nr
-    for (let i = 0; i < el.childNodes.length; i++) {
-      const child = el.childNodes.item(i);
-      if (child.tagName === "kop") {
-        for (let j = 0; j < child.childNodes.length; j++) {
-          const gchild = child.childNodes.item(j);
-          if (gchild.tagName === "nr" && gchild.textContent?.trim() === artikelnummer) {
-            return el;
-          }
-        }
-      }
-    }
-  }
-
-  for (let i = 0; i < el.childNodes.length; i++) {
-    const child = el.childNodes.item(i);
-    if (child.nodeType === 1) {
-      const found = zoekElementInDom(child, artikelnummer);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
     if (name === "wettenbank_zoek") {
-      const parsedInput = ZoekInputSchema.safeParse(args);
-      if (!parsedInput.success) {
-        return { content: [{ type: "text", text: JSON.stringify({ fout: parsedInput.error.issues[0].message }) }] };
-      }
-      const { titel, rechtsgebied, ministerie, regelingsoort, maxResultaten, peildatum } = parsedInput.data;
+      const parsed = ZoekInputSchema.safeParse(args);
+      if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+      const { titel, rechtsgebied, ministerie, regelingsoort, maxResultaten, peildatum } = parsed.data;
 
-      const delen: string[] = [];
-      if (titel) delen.push(`overheidbwb.titel any "${titel}"`);
-      if (rechtsgebied) delen.push(`overheidbwb.rechtsgebied == "${rechtsgebied}"`);
-      if (ministerie) delen.push(`overheid.authority == "${ministerie}"`);
-      if (regelingsoort) delen.push(`dcterms.type == "${regelingsoort}"`);
-      delen.push(`overheidbwb.geldigheidsdatum==${peildatum}`);
-      const query = delen.join(" and ");
-      const xml = await sruRequest(query, maxResultaten);
-      const ruw = parseRecords(xml);
-      const lijst = dedupliceerOpBwbId(ruw);
+      const queryDelen: string[] = [];
+      if (titel) queryDelen.push(`overheidbwb.titel any "${titel}"`);
+      if (rechtsgebied) queryDelen.push(`overheidbwb.rechtsgebied == "${rechtsgebied}"`);
+      if (ministerie) queryDelen.push(`overheid.authority == "${ministerie}"`);
+      if (regelingsoort) queryDelen.push(`dcterms.type == "${regelingsoort}"`);
+      queryDelen.push(`overheidbwb.geldigheidsdatum==${peildatum}`);
 
-      const result = { query, totaal: lijst.length, dubbeleVerwijderd: ruw.length - lijst.length, regelingen: lijst };
-      const parsedOutput = ZoekOutputSchema.safeParse(result);
-      if (!parsedOutput.success) {
-        console.error("wettenbank_zoek output validatiefout:", parsedOutput.error);
-        return { content: [{ type: "text", text: JSON.stringify({ fout: "Onverwacht outputformaat" }) }] };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(parsedOutput.data) }] };
+      const xml = await sruRequest(queryDelen.join(" and "), maxResultaten);
+      const regelingen = dedupliceerOpBwbId(parseRecords(xml));
+
+      return { content: [{ type: "text", text: JSON.stringify({ totaal: regelingen.length, regelingen }) }] };
     }
 
     if (name === "wettenbank_artikel") {
-      const parsedInput = ArtikelInputSchema.safeParse(args);
-      if (!parsedInput.success) {
-        return { content: [{ type: "text", text: JSON.stringify({ fout: parsedInput.error.issues[0].message }) }] };
-      }
-      const { bwbId, artikel, lid, peildatum } = parsedInput.data;
-      const lidnr: string | null = lid?.trim() || null;
-      const { regeling, rawXml, inhoud } = await haalWetstekstOp(bwbId, peildatum);
+      const parsed = ArtikelInputSchema.safeParse(args);
+      if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+      const { bwbId, artikel, lid, peildatum } = parsed.data;
+      const lidnr = lid?.trim() || null;
 
-      // Haal citeertitel + inwerkingtredingsdatum uit DOM; valt terug op SRU-metadata
-      let wetNaam = regeling.titel;
-      let versiedatum = regeling.geldigVanaf;
-      if (rawXml) {
-        const docDom = wetParser.parse(rawXml) as Record<string, unknown>;
-        const meta = extraheerDocMetadata(docDom);
-        if (meta.citeertitel) wetNaam = meta.citeertitel;
-        if (meta.versiedatum) versiedatum = meta.versiedatum;
+      const { doc, regeling } = await haalWetstekstOp(bwbId, peildatum);
+      const meta = extraheerDocMetadata(doc);
+      const wetNaam = meta.citeertitel || regeling.titel;
+
+      const { transformToMcpLite, normalizeNode, parseElement } = await import("./bwb-parser/index.js");
+      const artikelElement = zoekElementInDom(doc.documentElement, artikel);
+
+      if (!artikelElement) {
+        return { content: [{ type: "text", text: JSON.stringify({ fout: `Artikel ${artikel} niet gevonden.` }) }] };
       }
 
-      let artikelResultaat: { tekst: string; structuurpad: string[]; leden: { lid: string; tekst: string }[] } | null = null;
-      if (rawXml) {
-        artikelResultaat = extraheerArtikelUitXml(rawXml, artikel, lidnr ?? undefined);
+      const rawNode = parseElement(artikelElement, bwbId, []);
+      const normalized = normalizeNode(rawNode);
+      let results = transformToMcpLite(normalized, bwbId, wetNaam);
+      
+      if (lidnr) {
+        results = results.filter(n => n.sectie.endsWith(` > Lid ${lidnr}`));
       }
 
-      // Fallback naar tekstgebaseerde extractie (geen lid-filter of structuurpad beschikbaar)
-      let artikelTekst: string | null = artikelResultaat?.tekst ?? null;
-      const structuurpad: string[] = artikelResultaat?.structuurpad ?? [];
-      const leden: { lid: string; tekst: string }[] = artikelResultaat?.leden ?? [];
-      if (!artikelTekst) {
-        artikelTekst = extraheerArtikel(inhoud, artikel);
-      }
+      const output = {
+        citeertitel: wetNaam,
+        versiedatum: meta.versiedatum || regeling.geldigVanaf,
+        bwbId,
+        artikel,
+        ...(lidnr && { lid: lidnr }),
+        sectie: results[0]?.sectie.split(" > Lid ")[0],
+        leden: results.map(r => ({
+          lid: r.sectie.match(/Lid (.*)$/)?.[1] || "",
+          tekst: r.tekst
+        })),
+        bronreferentie: `jci1.3:c:${bwbId}&artikel=${artikel}`,
+      };
 
-      const jci = bouwJciUri(bwbId, artikel, lidnr ?? undefined);
+      return { content: [{ type: "text", text: JSON.stringify(output) }] };
+    }
 
-      if (artikelTekst) {
-        const statusWaarschuwing = detecteerArtikelStatus(rawXml, artikel);
+    if (name === "wettenbank_zoekterm") {
+      const parsed = ZoektermInputSchema.safeParse(args);
+      if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+      const { bwbId, zoekterm, peildatum, maxResultaten } = parsed.data;
 
-        // Gebruik MCP-Lite transformatie voor schone Markdown tekst
-        let finaleLeden = leden;
-        let finaleSectie: string | undefined = undefined;
-        let finaleStructuurpad = structuurpad;
+      const { doc, regeling } = await haalWetstekstOp(bwbId, peildatum);
+      const meta = extraheerDocMetadata(doc);
+      const resultaat = zoekTermInArtikelDom(doc, parseZoekterm(zoekterm), maxResultaten);
 
-        if (rawXml) {
-          const { transformToMcpLite, normalizeNode, parseElement } = await import("./bwb-parser/index.js");
-          
-          const domParser = new DOMParser();
-          const doc = domParser.parseFromString(rawXml, "text/xml");
-          const root = doc.documentElement as any;
-          const artikelElement = zoekElementInDom(root, artikel);
-
-          if (artikelElement) {
-            // Gebruik bwb-id uit XML indien aanwezig
-            const actualBwbId = root.getAttribute("bwb-id") || bwbId;
-            
-            // Parseer ALLEEN dit element (en zijn kinderen) naar een BwbNode
-            const rawNode = parseElement(artikelElement, actualBwbId, []);
-            const normalized = normalizeNode(rawNode);
-            let results = transformToMcpLite(normalized, actualBwbId, wetNaam);
-            
-            // Filter op lid indien gevraagd
-            if (lidnr) {
-              results = results.filter(n => n.sectie.endsWith(` > Lid ${lidnr}`));
-            }
-
-            if (results.length > 0) {
-              // De sectie-naam halen we uit het eerste resultaat (zonder het lid-stukje)
-              finaleSectie = results[0].sectie.split(" > Lid ")[0];
-              
-              // We bouwen de leden array op basis van de getransformeerde tekst
-              finaleLeden = results.map(r => {
-                const match = r.sectie.match(/Lid (.*)$/);
-                return {
-                  lid: match ? match[1] : "",
-                  tekst: r.tekst
-                };
-              });
-            }
-          }
-        }
-
-        const artikelResult = {
-          citeertitel: wetNaam,
-          versiedatum,
-          bwbId,
-          artikel,
-          ...(lidnr !== null && { lid: lidnr }),
-          sectie: finaleSectie,
-          structuurpad: finaleStructuurpad,
-          leden: finaleLeden,
-          bronreferentie: jci,
-          waarschuwing: statusWaarschuwing ?? null,
-        };
-        const parsedOutput = ArtikelOutputSchema.safeParse(artikelResult);
-        if (!parsedOutput.success) {
-          console.error("wettenbank_artikel output validatiefout:", parsedOutput.error);
-          return { content: [{ type: "text", text: JSON.stringify({ fout: "Onverwacht outputformaat" }) }] };
-        }
-        return { content: [{ type: "text", text: JSON.stringify(parsedOutput.data) }] };
-      }
-      const artikelLabel = lidnr !== null ? `${artikel} lid ${lidnr}` : artikel;
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
-            citeertitel: wetNaam,
-            versiedatum,
+            wet: meta.citeertitel || regeling.titel,
             bwbId,
-            artikel,
-            ...(lidnr !== null && { lid: lidnr }),
-            fout: `Artikel ${artikelLabel} niet gevonden in deze wet.`,
-          }),
-        }],
+            zoekterm,
+            ...resultaat
+          })
+        }]
       };
     }
 
-    if (name === "wettenbank_zoekterm") {
-      const parsedInput = ZoektermInputSchema.safeParse(args);
-      if (!parsedInput.success) {
-        return { content: [{ type: "text", text: JSON.stringify({ fout: parsedInput.error.issues[0].message }) }] };
-      }
-      const { bwbId, zoekterm, peildatum, maxResultaten } = parsedInput.data;
-      const { rawXml, regeling } = await haalWetstekstOp(bwbId, peildatum);
-
-      // Haal citeertitel + versiedatum uit DOM; valt terug op SRU-metadata
-      let wetNaam = regeling.titel;
-      let versiedatum = regeling.geldigVanaf;
-      if (!rawXml) {
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ wet: wetNaam, versiedatum, bwbId, zoekterm, fout: "Wetstekst niet beschikbaar" }),
-          }],
-        };
-      }
-
-      const dom = wetParser.parse(rawXml) as Record<string, unknown>;
-      const meta = extraheerDocMetadata(dom);
-      if (meta.citeertitel) wetNaam = meta.citeertitel;
-      if (meta.versiedatum) versiedatum = meta.versiedatum;
-
-      const zoekInput = parseZoekterm(zoekterm);
-      const { artikelen, isVolledig, totaalTreffers } = zoekTermInArtikelDom(dom, zoekInput, maxResultaten);
-
-      const result = {
-        wet: wetNaam,
-        versiedatum,
-        bwbId,
-        zoekterm,
-        totaalTreffers,
-        isVolledig,
-        aantalArtikelen: artikelen.length,
-        artikelen: artikelen.map(t => ({
-          artikel: t.artikelnummer,
-          aantalTreffers: t.aantalTreffers,
-          leden: t.leden,
-        })),
-      };
-      const parsedOutput = ZoektermOutputSchema.safeParse(result);
-      if (!parsedOutput.success) {
-        console.error("wettenbank_zoekterm output validatiefout:", parsedOutput.error);
-        return { content: [{ type: "text", text: JSON.stringify({ fout: "Onverwacht outputformaat" }) }] };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(parsedOutput.data) }] };
-    }
-
-    return { content: [{ type: "text", text: JSON.stringify({ fout: `Onbekende tool: ${name}` }) }], isError: true };
+    return { content: [{ type: "text", text: `Onbekende tool: ${name}` }], isError: true };
   } catch (err) {
-    return {
-      content: [{ type: "text", text: JSON.stringify({ fout: err instanceof Error ? err.message : String(err) }) }],
-      isError: true,
-    };
+    return { content: [{ type: "text", text: JSON.stringify({ fout: (err as any).message }) }], isError: true };
   }
 });
 
-// Alleen starten als direct uitgevoerd (niet bij import in tests)
 const __filename = fileURLToPath(import.meta.url);
 if (process.argv[1] === __filename) {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Wettenbank MCP server gestart.");
 }
