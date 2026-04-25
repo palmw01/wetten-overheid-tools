@@ -13,11 +13,11 @@ const config: QuartzConfig = {
       ".obsidian",
       ".claude",
       ".git",
+      ".trash",
       "README.md",
       "CLAUDE.md",
       "settings.json",
       "**/template.md",
-      "**/.trash/**",
     ],
     defaultDateType: "modified",
     theme: {
@@ -57,7 +57,9 @@ const config: QuartzConfig = {
   plugins: {
     transformers: [
       Plugin.FrontMatter(),
-      Plugin.CreatedModifiedDate({ priority: ["frontmatter", "filesystem"] }),
+      Plugin.CreatedModifiedDate({
+        priority: ["frontmatter", "filesystem"],
+      }),
       Plugin.SyntaxHighlighting({
         theme: { light: "github-light", dark: "github-dark" },
         keepBackground: false,

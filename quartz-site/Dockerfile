@@ -1,26 +1,19 @@
-# Stage 1: Quartz installeren en bouwen
-FROM node:20-slim AS builder
+FROM node:20-slim
 WORKDIR /app
 
-# Quartz v4 ophalen
-RUN npx --yes quartz@latest create --directory /app --strategy empty 2>/dev/null || true
-COPY quartz-site/quartz.config.ts ./quartz.config.ts
-COPY quartz-site/quartz.layout.ts ./quartz.layout.ts
-
-# Stage 2: Runtime
-FROM node:20-slim AS runtime
-WORKDIR /app
-ENV NODE_ENV=production
-ENV TZ=Europe/Amsterdam
-ENV PORT=8080
-
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system app && adduser --system --ingroup app app
+# Quartz v4 installeren via git clone (officiële installatiemethode)
+RUN git clone --depth=1 https://github.com/jackyzha0/quartz.git . \
+    && npm ci
 
-COPY --from=builder /app ./
-RUN mkdir -p /app/content /app/public /app/logs && chown -R app:app /app
+# Onze site-configuratie over de standaard heen leggen
+COPY quartz-site/quartz.config.ts ./quartz.config.ts
+
+RUN addgroup --system app && adduser --system --ingroup app app \
+    && mkdir -p /app/content /app/public /app/logs \
+    && chown -R app:app /app
 
 USER app
 
@@ -29,5 +22,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
 
 EXPOSE 8080
 
-# content/ wordt als volume gemount vanuit de vault op de host
+# content/ wordt als volume gemount vanuit de vault op de NAS
 CMD ["npx", "quartz", "build", "--serve", "--port", "8080"]
