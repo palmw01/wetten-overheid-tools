@@ -28,7 +28,8 @@ RUN node -e " \
 # Statische HTML bouwen — fail hard als er geen output is
 RUN npx quartz build 2>&1 && \
     test "$(ls -A /app/public 2>/dev/null)" || \
-    (echo "FOUT: Quartz build produceerde geen bestanden in /app/public" && exit 1)
+    (echo "FOUT: Quartz build produceerde geen bestanden in /app/public" && exit 1) && \
+    echo "=== GEGENEREERDE BESTANDEN ===" && find /app/public -name "*.html" | sort
 
 # Stage 2: Alleen nginx + de gebouwde HTML-bestanden
 FROM nginx:alpine
