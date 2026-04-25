@@ -17,6 +17,22 @@ services:
     networks:
       - internal
 
+  quartz-site:
+    image: ghcr.io/palmw01/wetten-overheid-tools-quartz:latest
+    container_name: quartz-site
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /volume1/docker/quartz/content:/app/content
+      - /volume1/docker/quartz/logs:/app/logs
+    networks:
+      - internal
+
 networks:
   internal:
     external: true
