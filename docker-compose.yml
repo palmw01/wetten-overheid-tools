@@ -17,17 +17,6 @@ services:
     networks:
       - internal
 
-  quartz-site:
-    image: ghcr.io/palmw01/wetten-overheid-tools-quartz:latest
-    container_name: quartz-site
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    ports:
-      - "3002:3000"
-    networks:
-      - internal
-
 networks:
   internal:
     external: true

@@ -6,10 +6,7 @@ on:
     paths:
       - "mcp-debugger/**"
       - "wettenbank-mcp/src/**"
-      - "quartz-site/**"
   workflow_dispatch:
-  schedule:
-    - cron: "0 */6 * * *"   # fallback: elke 6 uur herbouwen met laatste vault-inhoud
 
 jobs:
   build-mcp-debugger:
@@ -38,30 +35,3 @@ jobs:
           file: ./mcp-debugger/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/wetten-overheid-tools:latest
-
-  build-quartz:
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & Push Quartz image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./quartz-site/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/wetten-overheid-tools-quartz:latest
