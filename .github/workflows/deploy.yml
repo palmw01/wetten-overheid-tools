@@ -8,6 +8,8 @@ on:
       - "wettenbank-mcp/src/**"
       - "quartz-site/**"
   workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"   # fallback: elke 6 uur herbouwen met laatste vault-inhoud
 
 jobs:
   build-mcp-debugger:

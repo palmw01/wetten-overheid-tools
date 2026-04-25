@@ -1,26 +1,28 @@
-FROM node:22-slim
+# Stage 1: Quartz installeren + vault klonen + statische site bouwen
+FROM node:22-slim AS builder
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl git ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Quartz v4 installeren via git clone (officiële installatiemethode)
+# Quartz v4 installeren
 RUN git clone --depth=1 https://github.com/jackyzha0/quartz.git . \
     && npm ci
 
-# Onze site-configuratie over de standaard heen leggen
+# Vault-inhoud klonen (publieke repo — geen auth nodig)
+RUN git clone --depth=1 https://github.com/palmw01/juridische-analyses.git ./content
+
+# Onze configuratie over de standaard heen leggen
 COPY quartz-site/quartz.config.ts ./quartz.config.ts
 
-RUN addgroup --system app && adduser --system --ingroup app app \
-    && mkdir -p /app/content /app/public /app/logs \
-    && chown -R app:app /app
+# Statische HTML bouwen
+RUN npx quartz build
 
-USER app
+# Stage 2: Alleen nginx + de gebouwde HTML-bestanden
+FROM nginx:alpine
+COPY --from=builder /app/public /usr/share/nginx/html
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
-  CMD curl -sf http://127.0.0.1:8080 || exit 1
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD wget -qO- http://localhost || exit 1
 
-EXPOSE 8080
-
-# content/ wordt als volume gemount vanuit de vault op de NAS
-CMD ["npx", "quartz", "build", "--serve", "--port", "8080"]
+EXPOSE 80

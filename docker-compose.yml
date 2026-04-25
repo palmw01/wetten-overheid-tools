@@ -21,15 +21,10 @@ services:
     image: ghcr.io/palmw01/wetten-overheid-tools-quartz:latest
     container_name: quartz-site
     restart: unless-stopped
-    environment:
-      TZ: Europe/Amsterdam
     security_opt:
       - no-new-privileges:true
     ports:
-      - "8080:8080"
-    volumes:
-      - /mnt/docker/quartz/content:/app/content
-      - /mnt/docker/quartz/logs:/app/logs
+      - "8080:80"
     networks:
       - internal
 
