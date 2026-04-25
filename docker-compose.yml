@@ -24,7 +24,7 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - "3002:80"
+      - "3002:3000"
     networks:
       - internal
 
