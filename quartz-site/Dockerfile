@@ -10,7 +10,8 @@ RUN git clone --depth=1 https://github.com/jackyzha0/quartz.git . \
     && npm ci
 
 # Vault-inhoud klonen (publieke repo — geen auth nodig)
-RUN git clone --depth=1 https://github.com/palmw01/juridische-analyses.git ./content
+# Quartz maakt content/ al aan bij npm ci; verwijder eerst
+RUN rm -rf ./content && git clone --depth=1 https://github.com/palmw01/juridische-analyses.git ./content
 
 # Onze configuratie over de standaard heen leggen
 COPY quartz-site/quartz.config.ts ./quartz.config.ts
