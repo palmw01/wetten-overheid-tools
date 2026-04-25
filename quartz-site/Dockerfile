@@ -1,7 +1,7 @@
 FROM node:20-slim
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl git \
+RUN apt-get update && apt-get install -y --no-install-recommends curl git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Quartz v4 installeren via git clone (officiële installatiemethode)
