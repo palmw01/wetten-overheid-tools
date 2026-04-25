@@ -28,8 +28,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - /volume1/docker/quartz/content:/app/content
-      - /volume1/docker/quartz/logs:/app/logs
+      - /mnt/docker/quartz/content:/app/content
+      - /mnt/docker/quartz/logs:/app/logs
     networks:
       - internal
 
