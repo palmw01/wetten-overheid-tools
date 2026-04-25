@@ -8,7 +8,7 @@ const config: QuartzConfig = {
     enablePopovers: true,
     analytics: null,
     locale: "nl-NL",
-    baseUrl: "localhost:8080",
+    baseUrl: "quartz.ipalm.nl",
     ignorePatterns: [
       ".obsidian",
       ".claude",
