@@ -10,14 +10,12 @@ RUN git clone --depth=1 https://github.com/jackyzha0/quartz.git . \
     && npm ci
 
 # Vault-inhoud klonen (publieke repo — geen auth nodig)
-# Quartz maakt content/ al aan bij npm ci; verwijder eerst
 RUN rm -rf ./content && git clone --depth=1 https://github.com/palmw01/juridische-analyses.git ./content
 
-# Onze configuratie over de standaard heen leggen
-COPY quartz-site/quartz.config.ts ./quartz.config.ts
-
-# Statische HTML bouwen
-RUN npx quartz build
+# Statische HTML bouwen — fail hard als er geen output is
+RUN npx quartz build 2>&1 && \
+    test "$(ls -A /app/public 2>/dev/null)" || \
+    (echo "FOUT: Quartz build produceerde geen bestanden in /app/public" && exit 1)
 
 # Stage 2: Alleen nginx + de gebouwde HTML-bestanden
 FROM nginx:alpine
@@ -26,6 +24,6 @@ RUN printf 'server {\n    listen 3000;\n    root /usr/share/nginx/html;\n    ind
     > /etc/nginx/conf.d/default.conf
 
 HEALTHCHECK --interval=30s --timeout=5s \
-  CMD wget -qO- http://localhost || exit 1
+  CMD wget -qO- http://localhost:3000 || exit 1
 
-EXPOSE 80
+EXPOSE 3000
